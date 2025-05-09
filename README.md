@@ -6,7 +6,7 @@ This Python CLI application provides a unified interface to interact with multip
 
 The application has two implementations:
 1. **Direct API Implementation** - Uses the AI providers' APIs directly (supports Gemini, OpenAI, and Anthropic)
-2. **ADK Implementation** - Uses Google's Agent Development Kit (ADK) for enhanced Gemini integration
+2. **ADK Implementation** - Uses Google's Agent Development Kit (ADK) for enhanced Gemini integration with additional capabilities
 
 ## Prerequisites
 
@@ -24,7 +24,7 @@ The application has two implementations:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/addhe/gemini-chatgpt-cli.git
+git clone https://github.com/addhe/infrabot-nlp.git
 ```
 
 2. Create a virtual environment:
@@ -110,7 +110,7 @@ gcloud auth application-default login
 ### Installation via Docker
 1. Build the Docker image:
 ```bash
-docker build --tag gemini-chatgpt-cli:v1.0 .
+docker build --tag infrabot-nlp:v1.0 .
 ```
 
 2. Run the container with your API keys:
@@ -119,13 +119,15 @@ docker run -it --name your-container-name \
   --env GOOGLE_API_KEY=your-gemini-api-key \
   --env OPENAI_API_KEY=your-openai-api-key \
   --env ANTHROPIC_API_KEY=your-anthropic-api-key \
-  gemini-chatgpt-cli:v1.0
+  infrabot-nlp:v1.0
 ```
 
 Example:
 ```bash
-docker run -it --name ai-cli-test --env GOOGLE_API_KEY=your-actual-key gemini-chatgpt-cli:v1.0
+docker run -it --name ai-cli-test --env GOOGLE_API_KEY=your-actual-key infrabot-nlp:v1.0
 ```
+
+Note: The current Dockerfile needs to be updated as it references a `gemini-bot.py` file that doesn't exist in the repository. The correct entry point files are `run_agent.py` and `run_adk_agent.py`.
 
 ## Features
 
@@ -151,7 +153,7 @@ If you encounter any issues, check the following:
 
 ## Project Structure
 
-The project has been refactored into a modular structure:
+The project is organized into a modular structure:
 
 ```
 ├── adk_cli_agent/            # ADK implementation
@@ -164,6 +166,7 @@ The project has been refactored into a modular structure:
 │
 ├── my_cli_agent/             # Direct API implementation
 │   ├── agent.py              # Main agent implementation using direct APIs
+│   ├── providers/            # AI model providers implementations
 │   ├── tools/                # Tool modules for direct API implementation
 │   │   ├── __init__.py
 │   │   ├── base.py           # Base classes for tools
@@ -174,6 +177,9 @@ The project has been refactored into a modular structure:
 │
 ├── run_agent.py              # Entry point for direct API implementation
 ├── run_adk_agent.py          # Entry point for ADK implementation
+├── run_openai_agent.py       # Entry point for OpenAI-specific implementation
+├── Dockerfile                # Docker containerization configuration
+├── coding_style.md           # Coding style guidelines for the project
 └── requirements.txt          # Project dependencies
 ```
 
@@ -184,3 +190,12 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Security Notes
+
+This application requires API keys for various AI services. These keys are accessed through environment variables and are never stored directly in the code. When using this application:
+
+1. Never commit your API keys to the repository
+2. Use environment variables or a `.env` file (which is gitignored) to store your keys
+3. When using Docker, pass your API keys as environment variables to the container
+4. Be careful when sharing logs or screenshots that might contain your API keys
