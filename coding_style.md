@@ -1,13 +1,17 @@
-# Coding Style Guide
+# Coding Style Guide / Pedoman Gaya Penulisan Kode
+
+This document outlines the coding style guidelines for the Gemini-ChatGPT CLI project. These guidelines
+follow Python PEP 8 standards with project-specific adaptations, targeting Python 3.13+ features.
 
 Dokumen ini menjelaskan pedoman gaya penulisan kode untuk proyek Gemini-ChatGPT CLI. Pedoman ini
-mengikuti standar Python PEP 8 dengan beberapa penyesuaian khusus untuk proyek ini.
+mengikuti standar Python PEP 8 dengan penyesuaian khusus untuk proyek ini, menargetkan fitur Python 3.13+.
 
-## Prinsip Umum
+## General Principles / Prinsip Umum
 
-- Keterbacaan kode sangat penting.
-- Konsistensi dalam seluruh codebase harus dipertahankan.
-- Kode harus mudah dipahami dan dipelihara oleh orang lain.
+- Code readability is paramount / Keterbacaan kode sangat penting
+- Maintain consistency throughout the codebase / Konsistensi dalam seluruh codebase harus dipertahankan
+- Code should be easily understood and maintained by others / Kode harus mudah dipahami dan dipelihara oleh orang lain
+- Leverage Python 3.13+ features when beneficial / Manfaatkan fitur Python 3.13+ bila bermanfaat
 
 ## Konvensi Penamaan
 
