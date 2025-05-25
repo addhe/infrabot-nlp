@@ -10,14 +10,17 @@ The application has two implementations:
 
 ## Prerequisites
 
-* Python 3.7 or later
+* Python 3.7 or later (Python 3.13 recommended for best performance)
+* Operating System:
+  * Fully tested on macOS
+  * Compatible with Linux and Windows (some features may require additional configuration)
 * API keys for the models you want to use:
   * Google Gemini API key
   * OpenAI API key (optional, only for direct API implementation)
   * Anthropic API key (optional, only for direct API implementation)
 * Google Cloud Application Default Credentials (for GCP project operations)
 * Virtual environment
-* Dependencies listed in requirements.txt
+* Dependencies listed in requirements.txt (updated as of May 2025)
 
 ## Installation
 
