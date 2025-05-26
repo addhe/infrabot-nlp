@@ -1,8 +1,9 @@
-"\"\"ADK CLI Agent implementation.
+"""ADK CLI Agent implementation.
 
 This module implements a CLI agent using Google's Agent Development Kit (ADK).
 It provides tools for getting current time, executing commands, and listing/creating GCP projects.
-\"\"\"
+"""
+
 import os
 import atexit
 from google.adk.agents import Agent
@@ -14,7 +15,7 @@ from .tools.command_tools import execute_command
 from .tools.gcp_tools import list_gcp_projects, create_gcp_project, HAS_GCP_TOOLS_FLAG
 
 def cleanup():
-    \"\"\"Clean up resources before exit.\"\"\"
+    """Clean up resources before exit."""
     try:
         # Force cleanup of gRPC channels
         import grpc
@@ -54,7 +55,7 @@ root_agent = Agent(
     name="gemini_cli_agent",
     model=model_id,
     description="A CLI agent that can help with time, execute commands, list and create GCP projects",
-    instruction=\"\"\"You are a helpful CLI agent that can answer questions and execute commands.
+    instruction="""You are a helpful CLI agent that can answer questions and execute commands.
     You can provide the current time in various cities, execute shell commands.
     If GCP tools are available, you can also list GCP projects (specify 'all' for all projects, or 'dev', 'stg', 'prod' to filter by environment),
     and create new GCP projects when requested.
@@ -65,6 +66,6 @@ root_agent = Agent(
 
     Always be helpful, concise, and accurate in your responses.
     If a tool required for a request is not available (e.g. GCP tools), inform the user.
-    \"\"\",
+    """,
     tools=tools
 )

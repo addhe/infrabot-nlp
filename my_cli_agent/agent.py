@@ -285,350 +285,113 @@ class AnthropicProvider(LLMProvider):
         return full_response
 
 class Agent:
-    """A conversational agent that can use tools to help answer questions."""
+    """Main agent class for handling commands and interactions with AI models."""
     
-    def __init__(self):
-        self.history: List[ChatHistory] = []
-        self.conversation: List[Dict[str, str]] = [
-            {"role": "system", "content": "You are a helpful assistant that can use tools to help answer questions."}
-        ]
+    def __init__(self, model_provider):
+        """Initialize agent with a model provider."""
+        self.model_provider = model_provider
+        self.tool_modules = {}
+        self._load_tools()
         
-        # Initialize tools dictionary
-        self.tools = {
-            "get_current_time": get_current_time,
-            "execute_command": execute_command
+    @property
+    def has_gcp_tools(self) -> bool:
+        """Check if GCP tools are available."""
+        try:
+            from my_cli_agent.tools.gcp_tools import HAS_GCP_TOOLS
+            return HAS_GCP_TOOLS
+        except ImportError:
+            return False
+    
+    def _load_tools(self):
+        """Load available tool modules."""
+        from my_cli_agent.tools import command_tools, time_tools, gcp_tools
+        self.tool_modules = {
+            'command': command_tools,
+            'time': time_tools,
+            'gcp': gcp_tools
         }
-        
-        # Add GCP tools if available
-        if HAS_GCP_TOOLS:
-            self.tools["list_gcp_projects"] = list_gcp_projects
-            self.tools["create_gcp_project"] = create_gcp_project
-            self.tools["delete_gcp_project"] = delete_gcp_project
-        
-        # Determine which AI provider to use
-        self.provider = self._setup_provider()
-        
-        # Register cleanup on exit
-        atexit.register(self.cleanup)
     
-    def _setup_provider(self) -> LLMProvider:
-        """Set up the appropriate LLM provider based on available API keys."""
-        # Check available providers
-        providers = []
+    def execute_command(self, command: str) -> ToolResult:
+        """
+        Execute a shell command using the command tools.
         
-        if HAS_GEMINI and os.getenv("GOOGLE_API_KEY"):
-            providers.append(("gemini", GeminiProvider()))
+        Args:
+            command: The shell command to execute
             
-        if HAS_OPENAI and os.getenv("OPENAI_API_KEY"):
-            providers.append(("openai", OpenAIProvider()))
+        Returns:
+            ToolResult containing the command output or error
+        """
+        from my_cli_agent.tools.command_tools import execute_command
+        return execute_command(command)
+    
+    def get_time(self, city: str) -> ToolResult:
+        """
+        Get the current time for a specific city.
+        
+        Args:
+            city: The city to get the time for
             
-        if HAS_ANTHROPIC and os.getenv("ANTHROPIC_API_KEY"):
-            providers.append(("anthropic", AnthropicProvider()))
+        Returns:
+            ToolResult containing the current time or error
+        """
+        from my_cli_agent.tools.time_tools import get_current_time
+        return get_current_time(city)
+    
+    def list_gcp_projects(self, environment: str = None) -> ToolResult:
+        """
+        List GCP projects for the specified environment.
         
-        if not providers:
-            # Check which providers are available but missing API keys
-            missing_keys = []
-            if HAS_GEMINI and not os.getenv("GOOGLE_API_KEY"):
-                missing_keys.append("GOOGLE_API_KEY")
-            if HAS_OPENAI and not os.getenv("OPENAI_API_KEY"):
-                missing_keys.append("OPENAI_API_KEY")
-            if HAS_ANTHROPIC and not os.getenv("ANTHROPIC_API_KEY"):
-                missing_keys.append("ANTHROPIC_API_KEY")
-                
-            if missing_keys:
-                raise ValueError(f"Missing API key(s): {', '.join(missing_keys)}")
-            else:
-                raise ValueError("No AI providers available. Please install at least one of: google-generativeai, openai, or anthropic")
+        Args:
+            environment: Optional environment filter (e.g., 'dev', 'prod')
+            
+        Returns:
+            ToolResult containing the list of projects or error
+        """
+        from my_cli_agent.tools.gcp_tools import list_gcp_projects
+        return list_gcp_projects(environment)
         
-        # Use the first available provider
-        provider_name, provider = providers[0]
-        self.provider_name = provider_name
+    def create_gcp_project(self, project_id: str, name: str = None) -> ToolResult:
+        """
+        Create a new GCP project.
         
-        # Set up the provider
-        provider.setup()
+        Args:
+            project_id: The project ID to create (can be in format 'id,name,org')
+            name: The display name for the project (defaults to project_id)
+            
+        Returns:
+            ToolResult containing the result of the operation or error information
+        """
+        from my_cli_agent.tools.gcp_tools import create_gcp_project
+        return create_gcp_project(project_id, name)
+    
+    def process_command(self, command: str) -> str:
+        """
+        Process a user command through the AI model and execute any required tools.
         
-        return provider
-
-    def cleanup(self):
-        """Clean up resources before exit."""
+        Args:
+            command: The user's command or query
+            
+        Returns:
+            The final response to show to the user
+        """
         try:
-            # Force cleanup of gRPC channels
-            for channel in grpc._channel._channel_pool:
-                try:
-                    channel.close()
-                except:
-                    pass
-            grpc._channel._channel_pool.clear()
-        except:
-            pass
-
-    def add_to_history(self, role: str, content: str):
-        """Add a message to the chat history."""
-        self.history.append(ChatHistory(
-            role=role,
-            content=content,
-            timestamp=time.time()
-        ))
-        
-        # Also add to conversation for the LLM
-        self.conversation.append({
-            "role": role,
-            "content": content
-        })
-
-    def process_with_tools(self, prompt: str):
-        """Process user input and execute appropriate tools based on the content."""
-        try:
-            # Add user message to history
-            self.add_to_history("user", prompt)
+            # Get AI model's response
+            response = self.model_provider.send_message(command)
             
-            # First, check if this is a direct tool request
-            tool_result = self._check_direct_tool_request(prompt)
-            if tool_result:
-                return
-            
-            # Create a tool selection prompt
-            tool_selection_prompt = self._create_tool_selection_prompt(prompt)
-            
-            # Get a response from the LLM about which tool to use
-            tool_response = self.provider.generate_response(tool_selection_prompt, self.conversation)
-            
-            # Parse the tool response
-            if "TOOL:" in tool_response:
-                self._handle_tool_response(tool_response)
-            else:
-                # No tool needed, just have a conversation
-                response = self.provider.stream_response(prompt, self.conversation)
-                self.add_to_history("assistant", response)
-                
-        except Exception as e:
-            error_msg = f"An error occurred: {str(e)}"
-            print(error_msg)
-            self.add_to_history("assistant", error_msg)
-    
-    def _check_direct_tool_request(self, prompt: str) -> bool:
-        """Check if the prompt is a direct request to use a specific tool."""
-        prompt_lower = prompt.lower()
-        
-        # Check for time requests
-        if any(phrase in prompt_lower for phrase in ["what time", "current time", "time now", "time in"]):
-            city = None
-            for known_city in ["new york", "paris", "jakarta", "tokyo", "london", "sydney"]:
-                if known_city in prompt_lower:
-                    city = known_city
-                    break
-            
-            result = get_current_time(city or "")
-            self._display_tool_result(result)
-            return True
-            
-        # Check for command execution requests
-        if any(phrase in prompt_lower for phrase in ["run command", "execute command", "run the command"]):
-            # Try to extract the command
-            command = None
-            if "`" in prompt:
-                # Extract command from backticks
-                parts = prompt.split("`")
-                if len(parts) >= 3:
-                    command = parts[1]
-            elif ":" in prompt:
-                # Extract command after colon
-                command = prompt.split(":", 1)[1].strip()
-            
-            if command:
-                result = execute_command(command)
-                self._display_tool_result(result)
-                return True
-        
-        # Check for GCP project deletion requests
-        if HAS_GCP_TOOLS and any(phrase in prompt_lower for phrase in [
-            "delete gcp", "hapus gcp", "remove gcp", "delete project", "hapus project", 
-            "remove project", "delete the project", "hapus proyek", "tolong hapus", "tolong delete"]):
-            
-            # Try to extract the project ID
-            project_id = None
-            
-            # Look for quoted project ID
-            import re
-            quoted_match = re.search(r'["\']([\w\-]+)["\']', prompt)
-            if quoted_match:
-                project_id = quoted_match.group(1)
-            else:
-                # Look for common project ID patterns
-                id_match = re.search(r'\b([\w\-]+(?:-dev|-stg|-prd|-prod))\b', prompt)
-                if id_match:
-                    project_id = id_match.group(1)
-                else:
-                    # Look for any word that might be a project ID
-                    words = prompt.split()
-                    for word in words:
-                        if re.match(r'^[\w\-]+$', word) and len(word) > 3 and word not in [
-                            "delete", "hapus", "remove", "project", "proyek", "gcp", "the", "tolong"]:
-                            project_id = word
-                            break
-            
-            if project_id:
-                # Execute the tool
-                result = delete_gcp_project(project_id)
-                self._display_tool_result(result)
-                return True
-        
-        # Check for GCP project listing requests
-        if HAS_GCP_TOOLS and any(phrase in prompt_lower for phrase in [
-            "list gcp", "show gcp", "gcp project", "projects", "project list", 
-            "tampilkan project", "ada berapa", "berapa banyak", "semua project", 
-            "all project", "project apa saja"]):
-            
-            # Determine environment
-            env = "all"  # Default to all projects
-            
-            # Check for specific environment requests
-            if any(env_word in prompt_lower for env_word in ["dev", "development"]):
-                env = "dev"
-            elif any(env_word in prompt_lower for env_word in ["stg", "staging"]):
-                env = "stg"
-            elif any(env_word in prompt_lower for env_word in ["prod", "production"]):
-                env = "prod"
-            elif any(env_word in prompt_lower for env_word in ["other", "misc", "miscellaneous", "non-env"]):
-                env = "other"
-            elif any(word in prompt_lower for word in ["all", "semua", "every", "any", "all projects", "semua project"]):
-                env = "all"
-            
-            # Execute the tool
-            result = list_gcp_projects(env)
-            self._display_tool_result(result)
-            return True
-        
-        return False
-    
-    def _create_tool_selection_prompt(self, prompt: str) -> str:
-        """Create a prompt to help the LLM select the appropriate tool."""
-        tool_instructions = [
-            f"Based on this user request: \"{prompt}\"",
-            "If this is a request to view file contents, use execute_command with 'cat' and proper path quoting.",
-            "If this is a request to run a command, use execute_command.",
-            "If this is a request about time, use get_current_time."
-        ]
-            
-        # Add GCP projects instruction if available
-        if HAS_GCP_TOOLS:
-            tool_instructions.append("If this is a request about GCP projects, use list_gcp_projects with the environment name (dev/stg/prod).")
-            tool_instructions.append("If this is a request to create a GCP project, use create_gcp_project with the project ID and optional project name.")
-            tool_instructions.append("If this is a request to delete a GCP project, use delete_gcp_project with the project ID.")
-        
-        tool_instructions.extend([
-            "If none of the above tools are needed, respond with 'NO_TOOL_NEEDED' and I will handle the request directly.",
-            "Respond in the following format:",
-            "TOOL: <tool_name>",
-            "ARGS: <tool_arguments>"
-        ])
-        
-        return "\n".join(tool_instructions)
-    
-    def _handle_tool_response(self, tool_response: str):
-        """Handle a tool response from the LLM."""
-        try:
-            lines = tool_response.split("\n")
-            tool_line = next((line for line in lines if line.startswith("TOOL:")), None)
-            args_line = next((line for line in lines if line.startswith("ARGS:")), None)
-            
-            if not tool_line or not args_line:
-                print("\nError: Invalid tool response format.")
-                return
-            
-            tool_name = tool_line.replace("TOOL:", "").strip()
-            tool_arg = args_line.replace("ARGS:", "").strip()
-
-            # Clean up the argument
-            if ":" in tool_arg:
-                tool_arg = tool_arg.split(":")[-1].strip()
-            
-            # Clean up arguments for list_gcp_projects
-            if tool_name == "list_gcp_projects":
-                # Extract just the environment name (dev, stg, prod)
-                # First remove parameter prefix if present
-                if "=" in tool_arg:
-                    tool_arg = tool_arg.split("=")[-1].strip()
-                
-                # Use regex to extract just the environment name
-                import re
-                
-                # Check if user wants all projects
-                if any(word in tool_arg.lower() for word in ["all", "semua", "every", "any"]):
-                    tool_arg = "all"
-                else:
-                    env_match = re.search(r'(dev|development|stg|staging|prod|production)', tool_arg.lower())
-                    if env_match:
-                        tool_arg = env_match.group(1)
+            # Check if we need to execute any tools
+            for tool_name, tool_module in self.tool_modules.items():
+                if tool_name in response.lower():
+                    # Execute relevant tool function
+                    tool_result = tool_module.execute_command(command)
+                    if tool_result.success:
+                        return f"Tool execution result: {tool_result.result}"
                     else:
-                        # Default to all if no environment specified
-                        tool_arg = "all"
-                    
-            # Clean up arguments for create_gcp_project
-            elif tool_name == "create_gcp_project":
-                # Parse project_id, project_name, and organization_id from the argument
-                import re
-                
-                # Initialize variables
-                project_id = ""
-                project_name = ""
-                organization_id = ""
-                
-                # Extract project_id
-                project_id_match = re.search(r'project_id\s*=\s*["\'](.*?)["\']', tool_arg)
-                if project_id_match:
-                    project_id = project_id_match.group(1)
-                else:
-                    # Try to get the first quoted string or word
-                    project_id_match = re.search(r'["\'](.*?)["\']', tool_arg)
-                    if project_id_match:
-                        project_id = project_id_match.group(1)
-                    else:
-                        # Just use the first word
-                        project_id = tool_arg.split()[0] if tool_arg.split() else ""
-                
-                # Extract project_name if present
-                project_name_match = re.search(r'project_name\s*=\s*["\'](.*?)["\']', tool_arg)
-                if project_name_match:
-                    project_name = project_name_match.group(1)
-                
-                # Extract organization_id if present
-                org_id_match = re.search(r'organization_id\s*=\s*["\'](.*?)["\']', tool_arg)
-                if org_id_match:
-                    organization_id = org_id_match.group(1)
-                
-                # Clean up the extracted values
-                project_id = project_id.strip('"\'}{')
-                project_name = project_name.strip('"\'}{')
-                organization_id = organization_id.strip('"\'}{')
-                
-                # Construct a clean argument string
-                tool_arg = f"{project_id},{project_name},{organization_id}"
-                
-            # For cat commands, ensure path is properly quoted
-            if tool_name == "execute_command" and "cat" in tool_arg:
-                if '"' not in tool_arg and "'" not in tool_arg:
-                    file_path = tool_arg.split(" ")[-1]
-                    tool_arg = f'cat "{file_path}"'
-
-            if tool_name in self.tools:
-                # Execute tool
-                result = self.tools[tool_name](tool_arg)
-                self._display_tool_result(result)
-            else:
-                print(f"\nError: Tool '{tool_name}' is not available.")
+                        return f"Tool execution failed: {tool_result.error_message}"
+            
+            return response
+            
         except Exception as e:
-            print(f"\nError parsing tool response: {e}")
-    
-    def _display_tool_result(self, result):
-        """Display the result of a tool execution."""
-        if result.success:
-            print("\nResult:")
-            print("=" * 50)
-            print(result.result)
-            print("=" * 50)
-        else:
-            print("\nError:", result.error_message)
+            raise Exception(f"Error processing command: {str(e)}")
 
 def main():
     """Main function to run the CLI interface."""
