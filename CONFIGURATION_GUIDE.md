@@ -1,54 +1,54 @@
-# Configuration Guide for Gemini-ChatGPT CLI
+# Panduan Konfigurasi Gemini-ChatGPT CLI
 
-This guide provides detailed instructions on how to configure the Gemini-ChatGPT CLI application. Proper configuration is essential for the application to interact with the various AI models and cloud services it supports.
+Panduan ini memberikan petunjuk rinci tentang cara mengonfigurasi aplikasi Gemini-ChatGPT CLI. Konfigurasi yang tepat sangat penting agar aplikasi dapat berinteraksi dengan berbagai model AI dan layanan cloud yang didukung.
 
-## Table of Contents
+## Daftar Isi
 
-1.  [Prerequisites](#prerequisites)
-2.  [API Keys](#api-keys)
-    *   [Google Gemini API Key](#google-gemini-api-key)
-    *   [OpenAI API Key](#openai-api-key)
-    *   [Anthropic API Key](#anthropic-api-key)
-3.  [Google Cloud Configuration](#google-cloud-configuration)
-    *   [Application Default Credentials (ADC)](#application-default-credentials-adc)
-4.  [Environment Variables](#environment-variables)
-    *   [Setting Environment Variables](#setting-environment-variables)
-        *   [Option A: Direct Export](#option-a-direct-export)
-        *   [Option B: Using a `.env` File](#option-b-using-a-env-file)
-    *   [Required Environment Variables](#required-environment-variables)
-    *   [Optional Environment Variables](#optional-environment-variables)
-5.  [Model Configuration](#model-configuration)
-    *   [Default Model IDs](#default-model-ids)
-    *   [Customizing Model IDs](#customizing-model-ids)
-6.  [Docker Configuration](#docker-configuration)
+1.  [Prasyarat](#prasyarat)
+2.  [Kunci API](#kunci-api)
+    *   [Kunci API Google Gemini](#kunci-api-google-gemini)
+    *   [Kunci API OpenAI](#kunci-api-openai)
+    *   [Kunci API Anthropic](#kunci-api-anthropic)
+3.  [Konfigurasi Google Cloud](#konfigurasi-google-cloud)
+    *   [Kredensial Default Aplikasi (ADC)](#kredensial-default-aplikasi-adc)
+4.  [Variabel Lingkungan](#variabel-lingkungan)
+    *   [Mengatur Variabel Lingkungan](#mengatur-variabel-lingkungan)
+        *   [Opsi A: Ekspor Langsung](#opsi-a-ekspor-langsung)
+        *   [Opsi B: Menggunakan File `.env`](#opsi-b-menggunakan-file-env)
+    *   [Variabel Lingkungan yang Diperlukan](#variabel-lingkungan-yang-diperlukan)
+    *   [Variabel Lingkungan Opsional](#variabel-lingkungan-opsional)
+5.  [Konfigurasi Model](#konfigurasi-model)
+    *   [ID Model Default](#id-model-default)
+    *   [Menyesuaikan ID Model](#menyesuaikan-id-model)
+6.  [Konfigurasi Docker](#konfigurasi-docker)
 
-## 1. Prerequisites
+## 1. Prasyarat
 
-Before configuring the application, ensure you have:
-*   Python 3.13 or later installed (recommended for optimal performance).
-*   Access to the necessary AI provider accounts (Google, OpenAI, Anthropic).
-*   Google Cloud SDK installed if you plan to use GCP-related features.
-*   Operating system compatibility:
-    * Fully tested on macOS
-    * Compatible with Linux and Windows (some features may require additional setup)
+Sebelum mengonfigurasi aplikasi, pastikan Anda memiliki:
+*   Python 3.13 atau yang lebih baru terinstal (direkomendasikan untuk performa optimal).
+*   Akses ke akun penyedia AI yang diperlukan (Google, OpenAI, Anthropic).
+*   Google Cloud SDK terinstal jika Anda berencana menggunakan fitur terkait GCP.
+*   Kompatibilitas sistem operasi:
+    * Sudah diuji sepenuhnya di macOS
+    * Kompatibel dengan Linux dan Windows (beberapa fitur mungkin memerlukan pengaturan tambahan)
 
-## 2. API Keys
+## 2. Kunci API
 
-The application requires API keys to authenticate with the AI service providers.
+Aplikasi memerlukan kunci API untuk mengautentikasi dengan penyedia layanan AI.
 
-### Google Gemini API Key
-*   **Purpose**: Required for interacting with Google's Gemini models.
-*   **How to obtain**: Visit [Google AI Studio](https://makersuite.google.com/app/apikey) to create or retrieve your API key.
-*   **Environment Variable**: `GOOGLE_API_KEY`
+### Kunci API Google Gemini
+*   **Tujuan**: Diperlukan untuk berinteraksi dengan model Gemini dari Google.
+*   **Cara Mendapatkan**: Kunjungi [Google AI Studio](https://makersuite.google.com/app/apikey) untuk membuat atau mengambil kunci API Anda.
+*   **Variabel Lingkungan**: `GOOGLE_API_KEY`
 
-### OpenAI API Key
-*   **Purpose**: Optional, required only if you intend to use OpenAI's GPT models via the direct API implementation.
-*   **How to obtain**: Visit the [OpenAI API keys page](https://platform.openai.com/api-keys).
-*   **Environment Variable**: `OPENAI_API_KEY`
+### Kunci API OpenAI
+*   **Tujuan**: Opsional, hanya diperlukan jika Anda bermaksud menggunakan model GPT dari OpenAI melalui implementasi API langsung.
+*   **Cara Mendapatkan**: Kunjungi [halaman kunci API OpenAI](https://platform.openai.com/api-keys).
+*   **Variabel Lingkungan**: `OPENAI_API_KEY`
 
-### Anthropic API Key
-*   **Purpose**: Optional, required only if you intend to use Anthropic's Claude models via the direct API implementation.
-*   **How to obtain**: Visit the [Anthropic Console settings](https://console.anthropic.com/settings/keys).
+### Kunci API Anthropic
+*   **Tujuan**: Opsional, hanya diperlukan jika Anda bermaksud menggunakan model Claude dari Anthropic melalui implementasi API langsung.
+*   **Cara Mendapatkan**: Kunjungi [pengaturan Konsol Anthropic](https://console.anthropic.com/settings/keys).
 *   **Environment Variable**: `ANTHROPIC_API_KEY`
 
 ## 3. Google Cloud Configuration
@@ -105,12 +105,12 @@ This method is recommended for development as it keeps your keys out of your she
     ```
     **Note**: The `my_cli_agent/.env` file is included in `.gitignore` to prevent accidental commits of sensitive information.
 
-### Required Environment Variables
-*   `GOOGLE_API_KEY`: Your API key for Google Gemini.
+### Variabel Lingkungan yang Diperlukan
+*   `GOOGLE_API_KEY`: Kunci API Anda untuk Google Gemini.
 
-### Optional Environment Variables
-*   `OPENAI_API_KEY`: Your API key for OpenAI models. Needed if using OpenAI models.
-*   `ANTHROPIC_API_KEY`: Your API key for Anthropic models. Needed if using Anthropic models.
+### Variabel Lingkungan Opsional
+*   `OPENAI_API_KEY`: Kunci API Anda untuk model OpenAI. Diperlukan jika menggunakan model OpenAI.
+*   `ANTHROPIC_API_KEY`: Kunci API Anda untuk model Anthropic. Diperlukan jika menggunakan model Anthropic.
 *   `GEMINI_MODEL_ID`: Specifies the Gemini model to use. Defaults to a predefined value if not set.
 *   `OPENAI_MODEL_ID`: Specifies the OpenAI model to use. Defaults to a predefined value if not set.
 *   `CLAUDE_MODEL_ID`: Specifies the Anthropic Claude model to use. Defaults to a predefined value if not set.

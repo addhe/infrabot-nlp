@@ -1,48 +1,48 @@
-# Security Policy
+# Kebijakan Keamanan
 
-The security of this project is taken seriously. We appreciate your efforts to responsibly disclose your findings.
+Keamanan proyek ini sangat kami perhatikan. Kami menghargai upaya Anda untuk mengungkapkan temuan Anda secara bertanggung jawab.
 
-## Reporting a Vulnerability
+## Melaporkan Kerentanan Keamanan
 
-If you discover a security vulnerability within this project, please report it to us as soon as possible. We request that you do not disclose the vulnerability publicly until we have had a chance to address it.
+Jika Anda menemukan kerentanan keamanan dalam proyek ini, harap laporkan kepada kami sesegera mungkin. Kami meminta Anda untuk tidak mengungkapkan kerentanan tersebut secara publik sampai kami memiliki kesempatan untuk menanganinya.
 
-Please email your findings to `security@infrabot-nlp.dev`.
+Silakan kirim temuan Anda ke `security@infrabot-nlp.dev`.
 
-When reporting a vulnerability, please include the following details:
+Saat melaporkan kerentanan, sertakan detail berikut:
 
-*   A clear description of the vulnerability.
-*   Steps to reproduce the vulnerability.
-*   The affected version(s) of the software.
-*   Any potential impact of the vulnerability.
-*   Any suggested mitigations, if you have any.
+*   Deskripsi yang jelas tentang kerentanan tersebut.
+*   Langkah-langkah untuk mereproduksi kerentanan.
+*   Versi perangkat lunak yang terpengaruh.
+*   Dampak potensial dari kerentanan tersebut.
+*   Saran mitigasi, jika ada.
 
-We will acknowledge receipt of your vulnerability report within 24 hours and will work with you to understand and validate the issue. We aim to address all valid security vulnerabilities in a timely manner.
+Kami akan mengonfirmasi penerimaan laporan kerentanan Anda dalam waktu 24 jam dan akan bekerja sama dengan Anda untuk memahami dan memvalidasi masalahnya. Kami berupaya untuk menangani semua kerentanan keamanan yang valid tepat waktu.
 
-## Disclosure Policy
+## Kebijakan Pengungkapan
 
-Once a vulnerability has been addressed, we may disclose the vulnerability details publicly. We will coordinate with the reporter on the timing and content of the disclosure. We may also choose not to disclose certain vulnerabilities depending on the circumstances.
+Setelah kerentanan ditangani, kami dapat mengungkap detail kerentanan tersebut kepada publik. Kami akan berkoordinasi dengan pelapor mengenai waktu dan isi pengungkapan. Kami juga dapat memilih untuk tidak mengungkapkan kerentanan tertentu tergantung pada situasinya.
 
-## Security Best Practices for Users
+## Praktik Keamanan Terbaik untuk Pengguna
 
-*   **API Keys**: This application requires API keys for various AI services.
-    *   **Never commit your API keys to any repository.**
-    *   Use environment variables or a `.env` file (which should be gitignored) to store your keys.
-    *   When using Docker, pass your API keys as environment variables to the container.
-    *   Be careful when sharing logs or screenshots that might contain your API keys.
-*   **Dependencies**: Keep your local dependencies up to date by regularly running `pip install -r requirements.txt --upgrade`.
-*   **Environment**: Run this application in a trusted environment. Be cautious about the commands you ask the AI to execute, especially if they involve system modifications or access to sensitive data.
-*   **Input Sanitization**: While the application may attempt to handle various inputs, be mindful of the prompts you provide to the AI models, especially if they are constructed from untrusted sources.
+*   **Kunci API**: Aplikasi ini memerlukan kunci API untuk berbagai layanan AI.
+    *   **Jangan pernah melakukan commit kunci API Anda ke repositori apa pun.**
+    *   Gunakan variabel lingkungan atau file `.env` (yang seharusnya diabaikan oleh git) untuk menyimpan kunci Anda.
+    *   Saat menggunakan Docker, teruskan kunci API Anda sebagai variabel lingkungan ke container.
+    *   Berhati-hatilah saat berbagi log atau tangkapan layar yang mungkin berisi kunci API Anda.
+*   **Dependensi**: Perbarui dependensi lokal Anda secara teratur dengan menjalankan `pip install -r requirements.txt --upgrade`.
+*   **Lingkungan**: Jalankan aplikasi ini di lingkungan yang tepercaya. Berhati-hatilah dengan perintah yang Anda minta untuk dieksekusi oleh AI, terutama jika melibatkan modifikasi sistem atau akses ke data sensitif.
+*   **Pembersihan Input**: Meskipun aplikasi dapat mencoba menangani berbagai input, perhatikan prompt yang Anda berikan ke model AI, terutama jika dibuat dari sumber yang tidak tepercaya.
 
-## Scope
+## Ruang Lingkup
 
-This security policy applies to the `infrabot-nlp` project and its core components. It does not apply to:
+Kebijakan keamanan ini berlaku untuk proyek `infrabot-nlp` dan komponen intinya. Kebijakan ini tidak berlaku untuk:
 
-*   Vulnerabilities in third-party dependencies (please report those to the respective projects).
-*   The security of the underlying AI models (Gemini, GPT, Claude) themselves (please report those to Google, OpenAI, or Anthropic, respectively).
-*   The security of the Google Cloud Platform (GCP) (please report those to Google Cloud).
+*   Kerentanan dalam dependensi pihak ketiga (harap laporkan ke proyek masing-masing).
+*   Keamanan model AI yang mendasari (Gemini, GPT, Claude) itu sendiri (harap laporkan ke Google, OpenAI, atau Anthropic, masing-masing).
+*   Keamanan Google Cloud Platform (GCP) (harap laporkan ke Google Cloud).
 
-## Contact
+## Kontak
 
-For any security-related questions or concerns that are not vulnerability reports, please contact `[PROJECT_EMAIL_OR_MAINTAINER_EMAIL]`.
+Untuk pertanyaan atau masalah keamanan yang bukan laporan kerentanan, silakan hubungi `[EMAIL_PROYEK_ATAU_PEMELIHARA]`.
 
-We value the contributions of security researchers and the broader community in helping us maintain a secure project.
+Kami menghargai kontribusi para peneliti keamanan dan komunitas yang lebih luas dalam membantu kami memelihara proyek yang aman.

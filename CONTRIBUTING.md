@@ -1,52 +1,52 @@
-# Contributing to Infrabot-NLP
+# Berkontribusi ke Infrabot-NLP
 
-First off, thank you for considering contributing to Infrabot-NLP! It's people like you that make Infrabot-NLP such a great tool.
+Pertama-tama, terima kasih telah mempertimbangkan untuk berkontribusi pada Infrabot-NLP! Orang-orang seperti Andalah yang membuat Infrabot-NLP menjadi alat yang hebat.
 
-This document provides guidelines for contributing to this project. Please read it carefully to ensure that your contributions can be integrated smoothly.
+Dokumen ini memberikan pedoman untuk berkontribusi pada proyek ini. Harap baca dengan cermat untuk memastikan kontribusi Anda dapat diintegrasikan dengan lancar.
 
-## How Can I Contribute?
+## Bagaimana Saya Bisa Berkontribusi?
 
-There are many ways you can contribute to Infrabot-NLP:
+Ada banyak cara Anda dapat berkontribusi pada Infrabot-NLP:
 
-*   **Reporting Bugs:** If you find a bug, please report it by opening an issue. Include as much detail as possible, such as steps to reproduce, expected behavior, and actual behavior.
-*   **Suggesting Enhancements:** If you have an idea for a new feature or an improvement to an existing one, please open an issue to discuss it.
-*   **Writing Code:** If you'd like to contribute code, please follow the guidelines below.
-*   **Improving Documentation:** Good documentation is crucial. If you find areas for improvement or new content to add, please let us know or submit a pull request.
-*   **Answering Questions:** Help other users by answering questions in the issue tracker or other community forums.
+*   **Melaporkan Bug:** Jika Anda menemukan bug, laporkan dengan membuka issue. Sertakan detail sebanyak mungkin, seperti langkah-langkah untuk mereproduksi, perilaku yang diharapkan, dan perilaku aktual.
+*   **Mengusulkan Peningkatan:** Jika Anda memiliki ide untuk fitur baru atau peningkatan untuk fitur yang sudah ada, silakan buka issue untuk mendiskusikannya.
+*   **Menulis Kode:** Jika Anda ingin berkontribusi kode, harap ikuti panduan di bawah ini.
+*   **Memperbaiki Dokumentasi:** Dokumentasi yang baik sangat penting. Jika Anda menemukan area untuk perbaikan atau konten baru untuk ditambahkan, beri tahu kami atau kirimkan pull request.
+*   **Menjawab Pertanyaan:** Bantu pengguna lain dengan menjawab pertanyaan di pelacak issue atau forum komunitas lainnya.
 
-## Getting Started
+## Memulai
 
-1.  **Fork the Repository:** Start by forking the main Infrabot-NLP repository to your GitHub account.
-2.  **Clone Your Fork:** Clone your forked repository to your local machine:
+1.  **Fork Repositori:** Mulailah dengan melakukan fork pada repositori utama Infrabot-NLP ke akun GitHub Anda.
+2.  **Clone Fork Anda:** Clone repositori hasil fork ke komputer lokal Anda:
     ```bash
-    git clone https://github.com/YOUR_USERNAME/infrabot-nlp.git
+    git clone https://github.com/NAMA_PENGGUNA_ANDA/infrabot-nlp.git
     cd infrabot-nlp
     ```
-3.  **Create a Virtual Environment:** It's recommended to work in a virtual environment:
+3.  **Buat Lingkungan Virtual:** Disarankan untuk bekerja di lingkungan virtual:
     ```bash
-    # Make sure you have Python 3.13 or later installed
+    # Pastikan Anda memiliki Python 3.13 atau yang lebih baru terinstal
     python3.13 -m venv venv
-    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    source venv/bin/activate  # Di Windows, gunakan `venv\Scripts\activate`
     ```
-4.  **Install Dependencies:** Install the project dependencies:
+4.  **Pasang Dependensi:** Pasang dependensi proyek:
     ```bash
-    # Install core dependencies
+    # Pasang dependensi inti
     pip install -r requirements.txt
-    # Install development dependencies
+    # Pasang dependensi pengembangan
     pip install -r requirements-dev.txt
     pip install -r requirements.txt
     ```
-5.  **Create a Branch:** Create a new branch for your changes. Use a descriptive name:
+5.  **Buat Cabang Baru:** Buat cabang baru untuk perubahan Anda. Gunakan nama yang deskriptif:
     ```bash
-    git checkout -b your-feature-name
+    git checkout -b nama-fitur-anda
     ```
 
-## Making Changes
+## Melakukan Perubahan
 
-*   **Coding Style:** Please follow the coding style guidelines outlined in `CODING_STYLE.md`.
-*   **Commit Messages:** Write clear and concise commit messages. Follow the conventional commit format if possible (e.g., `feat: add new GCP tool`, `fix: resolve issue with time parsing`).
-*   **Tests:** If you add new features, please include unit tests. If you fix a bug, add a test that covers the bug.
-*   **Documentation:** Update any relevant documentation if your changes affect user-facing behavior or the project's architecture.
+*   **Gaya Pengkodean:** Harap ikuti pedoman gaya pengkodean yang diuraikan dalam `CODING_STYLE.md`.
+*   **Pesan Commit:** Tulis pesan commit yang jelas dan ringkas. Ikuti format commit konvensional jika memungkinkan (misalnya, `feat: menambahkan alat GCP baru`, `fix: memperbaiki masalah parsing waktu`).
+*   **Pengujian:** Jika Anda menambahkan fitur baru, sertakan pengujian unit. Jika Anda memperbaiki bug, tambahkan pengujian yang mencakup bug tersebut.
+*   **Dokumentasi:** Perbarui dokumentasi yang relevan jika perubahan Anda memengaruhi perilaku yang terlihat pengguna atau arsitektur proyek.
 
 ## Submitting a Pull Request
 
