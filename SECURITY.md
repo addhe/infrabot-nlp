@@ -6,7 +6,7 @@ Keamanan proyek ini sangat kami perhatikan. Kami menghargai upaya Anda untuk men
 
 Jika Anda menemukan kerentanan keamanan dalam proyek ini, harap laporkan kepada kami sesegera mungkin. Kami meminta Anda untuk tidak mengungkapkan kerentanan tersebut secara publik sampai kami memiliki kesempatan untuk menanganinya.
 
-Silakan kirim temuan Anda ke `security@infrabot-nlp.dev`.
+Silakan kirim temuan Anda ke `addhe.warman+security@gmail.com`.
 
 Saat melaporkan kerentanan, sertakan detail berikut:
 
@@ -43,6 +43,6 @@ Kebijakan keamanan ini berlaku untuk proyek `infrabot-nlp` dan komponen intinya.
 
 ## Kontak
 
-Untuk pertanyaan atau masalah keamanan yang bukan laporan kerentanan, silakan hubungi `[EMAIL_PROYEK_ATAU_PEMELIHARA]`.
+Untuk pertanyaan atau masalah keamanan yang bukan laporan kerentanan, silakan hubungi `addhe.warman@gmail.com`.
 
 Kami menghargai kontribusi para peneliti keamanan dan komunitas yang lebih luas dalam membantu kami memelihara proyek yang aman.
