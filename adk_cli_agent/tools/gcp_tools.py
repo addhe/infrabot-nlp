@@ -8,7 +8,7 @@ import subprocess
 try:
     import google.auth
     from google.cloud import resourcemanager_v3
-    HAS_GCP_TOOLS_FLAG = True # Renamed to avoid conflict
+    HAS_GCP_TOOLS_FLAG = True  # Renamed to avoid conflict
 except ImportError:
     HAS_GCP_TOOLS_FLAG = False
 
@@ -38,11 +38,11 @@ def list_gcp_projects(env: str) -> dict:
             
             if not HAS_GCP_TOOLS_FLAG:
                 raise ImportError("Google Cloud libraries not found, skipping API approach.")
-
-            credentials, _ = google.auth.default() # Can raise DefaultCredentialsError
+            
+            credentials, _ = google.auth.default()  # Can raise DefaultCredentialsError
             client = resourcemanager_v3.ProjectsClient(credentials=credentials)
             
-            request = resourcemanager_v3.SearchProjectsRequest() # Searches projects accessible to the user
+            request = resourcemanager_v3.SearchProjectsRequest()  # Searches projects accessible to the user
             projects_list = []
             
             for project in client.search_projects(request=request):
@@ -58,7 +58,7 @@ def list_gcp_projects(env: str) -> dict:
             if projects_list:
                 return {
                     "status": "success",
-                    "report": "\\n".join(projects_list)
+                    "report": "\n".join(projects_list)
                 }
             else:
                 print(f"No projects matching '{env}' found via API, trying gcloud CLI.")
@@ -67,7 +67,7 @@ def list_gcp_projects(env: str) -> dict:
         except (ImportError, google.auth.exceptions.DefaultCredentialsError) as cred_api_error:
             print(f"Google Cloud API setup failed: {cred_api_error}, trying gcloud CLI.")
             # Fall through to CLI
-        except Exception as api_error: # Other API related errors
+        except Exception as api_error:  # Other API related errors
             print(f"API approach failed: {api_error}, trying gcloud CLI.")
             # Fall through to CLI
             
@@ -109,7 +109,7 @@ def list_gcp_projects(env: str) -> dict:
                 if filtered_projects:
                     return {
                         "status": "success",
-                        "report": "\\n".join(filtered_projects)
+                        "report": "\n".join(filtered_projects)
                     }
                 else:
                     print(f"No projects matching '{env}' found via gcloud CLI, using mock data.")
@@ -132,6 +132,7 @@ def list_gcp_projects(env: str) -> dict:
                 "some-staging-project-mock (mock-stg-4)",
                 "critical-prod-app-mock (mock-prod-5)"
             ]
+            
         elif env_lower == "dev" or env_lower == "development":
             projects_mock = [
                 "project-dev-1 (mock)", 
@@ -162,7 +163,7 @@ def list_gcp_projects(env: str) -> dict:
         if not projects_mock:
             report_msg = f"Using mock data: {report_detail} No mock projects to list for this environment."
         else:
-            report_msg = f"Using mock data: {report_detail}\\n" + "\\n".join(projects_mock)
+            report_msg = f"Using mock data: {report_detail}\n" + "\n".join(projects_mock)
             
         return {
             "status": "success", 
@@ -174,7 +175,7 @@ def list_gcp_projects(env: str) -> dict:
             "status": "error",
             "error_message": f"An unexpected error occurred in list_gcp_projects: {e}"
         }
-
+        
 def create_gcp_project(project_id: str, project_name: str = "", organization_id: str = "") -> dict:
     """Creates a new Google Cloud Platform (GCP) project.
     

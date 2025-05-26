@@ -1,4 +1,5 @@
 import os
+from typing import Optional, Dict, Any
 import google.generativeai as genai
 from .base import BaseProvider
 
@@ -29,23 +30,44 @@ class GeminiProvider(BaseProvider):
                 "threshold": "BLOCK_MEDIUM_AND_ABOVE"
             },
         ]
-        self.chat = None
+        self.chat_session = None
+        self._is_setup = False
         
-    def setup(self):
+    async def setup(self):
+        """Initialize the Gemini provider with API key."""
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("Missing GOOGLE_API_KEY environment variable.")
         genai.configure(api_key=api_key)
+        self._is_setup = True
         
-    def chat(self, prompt: str, **kwargs) -> str:
+    async def send_message(self, message: str, conversation_id: Optional[str] = None, **kwargs) -> str:
+        """
+        Send a message to the Gemini model and return the response.
+        
+        Args:
+            message: The message to send to the model
+            **kwargs: Additional arguments to pass to the model
+            
+        Returns:
+            The model's response as a string
+        """
+        if not self._is_setup:
+            await self.setup()
+            
         model = genai.GenerativeModel(
             model_name=self.model_id,
             generation_config=self.generation_config,
             safety_settings=self.safety_settings
         )
-        chat = model.start_chat()
-        response = chat.send_message(content=prompt)
+        
+        if self.chat_session is None:
+            self.chat_session = model.start_chat()
+            
+        response = await self.chat_session.send_message_async(content=message)
         return response.text
         
-    def cleanup(self):
-        pass  # No specific cleanup needed for Gemini
+    async def cleanup(self):
+        """Clean up any resources used by the provider."""
+        self.chat_session = None
+        self._is_setup = False

@@ -2,6 +2,7 @@ import subprocess
 import os
 import shlex
 import sys
+from subprocess import TimeoutExpired
 from .base import ToolResult
 
 def execute_command(command: str) -> ToolResult:
@@ -84,7 +85,7 @@ def execute_command(command: str) -> ToolResult:
             }
         )
         
-    except subprocess.TimeoutExpired:
+    except TimeoutExpired:
         error_msg = f"Command timed out after 30 seconds: {command}"
         print(f"\nTimeout Error:\n{'-' * 80}\n{error_msg}\n{'-' * 80}\n")
         return ToolResult(

@@ -118,6 +118,87 @@ except ConnectionError as e:
 - Test harus mencakup kasus normal dan edge case.
 - Gunakan mock untuk menguji komponen yang bergantung pada layanan eksternal.
 
+# Test-Driven Development (TDD) Guidelines / Panduan Pengembangan Berbasis Tes (TDD)
+
+## Testing Philosophy / Filosofi Pengujian
+
+Our development process follows Test-Driven Development (TDD) principles:
+
+1. Write test first (Red phase)
+2. Write minimum code to pass the test (Green phase)
+3. Refactor the code (Refactor phase)
+
+Proses pengembangan kita mengikuti prinsip-prinsip TDD:
+
+1. Tulis tes terlebih dahulu (Fase Merah)
+2. Tulis kode minimal untuk melewati tes (Fase Hijau)
+3. Refaktor kode (Fase Refaktor)
+
+## Test Structure / Struktur Tes
+
+```python
+# test_my_module.py
+from unittest.mock import Mock, patch
+import pytest
+
+class TestMyClass:
+    @pytest.fixture
+    def my_fixture(self):
+        # Setup code
+        yield setup_result
+        # Teardown code
+
+    def test_should_describe_expected_behavior(self, my_fixture):
+        # Arrange
+        input_data = "test"
+        expected = "result"
+        
+        # Act
+        result = my_fixture.method(input_data)
+        
+        # Assert
+        assert result == expected
+```
+
+## Test Naming Convention / Konvensi Penamaan Tes
+
+- Test files: `test_*.py`
+- Test classes: `Test*`
+- Test methods: `test_should_*`
+- Test descriptions should clearly state the expected behavior
+
+Example / Contoh:
+```python
+def test_should_return_error_when_api_key_missing():
+    pass
+
+def test_should_successfully_execute_shell_command():
+    pass
+```
+
+## Test Coverage Requirements / Persyaratan Cakupan Tes
+
+- Minimum coverage: 80% for all new code
+- Critical paths: 100% coverage required
+- Integration tests required for all API endpoints
+- Mock external dependencies
+
+## Running Tests / Menjalankan Tes
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov
+
+# Run specific test file
+pytest tests/unit/test_specific.py
+
+# Run tests matching pattern
+pytest -k "test_pattern"
+```
+
 ## Linting dan Formatting
 
 - Gunakan tools berikut untuk memastikan kode mengikuti pedoman:
