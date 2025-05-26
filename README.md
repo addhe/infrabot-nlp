@@ -1,54 +1,54 @@
 # Gemini-ChatGPT CLI
 
-## Introduction
+## Pendahuluan
 
-This Python CLI application provides a unified interface to interact with multiple AI models including Google's Gemini, OpenAI's GPT models, and Anthropic's Claude. It can perform various tasks including executing shell commands, checking time in different cities, listing GCP projects, and creating new GCP projects.
+Aplikasi CLI Python ini menyediakan antarmuka terpadu untuk berinteraksi dengan berbagai model AI termasuk Google Gemini, model GPT dari OpenAI, dan Claude dari Anthropic. Aplikasi ini dapat melakukan berbagai tugas termasuk mengeksekusi perintah shell, memeriksa waktu di berbagai kota, menampilkan daftar proyek GCP, dan membuat proyek GCP baru.
 
-The application has two implementations:
-1. **Direct API Implementation** - Uses the AI providers' APIs directly (supports Gemini, OpenAI, and Anthropic)
-2. **ADK Implementation** - Uses Google's Agent Development Kit (ADK) for enhanced Gemini integration with additional capabilities
+Aplikasi ini memiliki dua implementasi:
+1. **Implementasi API Langsung** - Menggunakan API langsung dari penyedia AI (mendukung Gemini, OpenAI, dan Anthropic)
+2. **Implementasi ADK** - Menggunakan Google's Agent Development Kit (ADK) untuk integrasi Gemini yang lebih baik dengan kemampuan tambahan
 
-## Prerequisites
+## Persyaratan
 
-* Python 3.7 or later (Python 3.13 recommended for best performance)
-* Operating System:
-  * Fully tested on macOS
-  * Compatible with Linux and Windows (some features may require additional configuration)
-* API keys for the models you want to use:
-  * Google Gemini API key
-  * OpenAI API key (optional, only for direct API implementation)
-  * Anthropic API key (optional, only for direct API implementation)
-* Google Cloud Application Default Credentials (for GCP project operations)
-* Virtual environment
-* Dependencies listed in requirements.txt (updated as of May 2025)
+* Python 3.7 atau lebih baru (Python 3.13 direkomendasikan untuk performa terbaik)
+* Sistem Operasi:
+  * Sudah diuji sepenuhnya di macOS
+  * Kompatibel dengan Linux dan Windows (beberapa fitur mungkin memerlukan konfigurasi tambahan)
+* Kunci API untuk model yang ingin Anda gunakan:
+  * Kunci API Google Gemini
+  * Kunci API OpenAI (opsional, hanya untuk implementasi API langsung)
+  * Kunci API Anthropic (opsional, hanya untuk implementasi API langsung)
+* Kredensial Default Aplikasi Google Cloud (untuk operasi proyek GCP)
+* Lingkungan virtual
+* Dependensi yang tercantum dalam requirements.txt (diperbarui per Mei 2025)
 
-## Installation
+## Instalasi
 
-1. Clone the repository:
+1. Clone repositori:
 
 ```bash
 git clone https://github.com/addhe/infrabot-nlp.git
 ```
 
-2. Create a virtual environment:
+2. Buat lingkungan virtual:
 
 ```bash
 python3 -m venv venv
 ```
 
-3. Activate the virtual environment:
+3. Aktifkan lingkungan virtual:
 
 ```bash
 source venv/bin/activate
 ```
 
-4. Install the requirements:
+4. Pasang dependensi yang diperlukan:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+## Penggunaan
 
 1. Obtain the necessary API keys:
    - Google Gemini API key: https://makersuite.google.com/app/apikey
@@ -145,20 +145,23 @@ Note: The current Dockerfile needs to be updated as it references a `gemini-bot.
 
 ## Troubleshooting
 
-If you encounter any issues, check the following:
+Jika Anda menemukan kesalahan, periksa hal-hal berikut:
 
-* Ensure that you have active API keys for the models you want to use
-* Make sure the API keys are set as environment variables
-* Check that the Python script is running in the virtual environment
-* Verify that all requirements are installed correctly
-* For GCP operations, ensure you have set up Google Cloud Application Default Credentials by running `gcloud auth application-default login`
-* If you see a warning about "Default value is not supported in function declaration schema for Google AI", this is a known issue with the Google AI SDK and does not affect functionality
+* Pastikan Anda memiliki kunci API aktif untuk model yang ingin Anda gunakan
+* Pastikan kunci API sudah diatur sebagai variabel lingkungan
+* Periksa apakah skrip Python berjalan di lingkungan virtual
+* Verifikasi bahwa semua dependensi sudah terinstal dengan benar
+* Untuk operasi GCP, pastikan Anda memiliki izin yang diperlukan dan Google Cloud SDK sudah dikonfigurasi dengan benar
+* Jika Anda melihat peringatan tentang "Default value is not supported in function declaration schema for Google AI", ini adalah masalah yang dikenal dengan Google AI SDK dan tidak mempengaruhi fungsionalitas
 
-## Project Structure
+## Struktur Proyek
 
-The project is organized into a modular structure:
+Proyek ini diorganisir dalam struktur modular:
 
 ```
+├── adk_cli_agent/            # Implementasi ADK
+│   ├── agent.py              # Implementasi agen utama menggunakan ADK
+│   ├── tools/                # Modul alat untuk implementasi ADK
 ├── adk_cli_agent/            # ADK implementation
 │   ├── agent.py              # Main agent implementation using ADK
 │   ├── tools/                # Tool modules for ADK implementation

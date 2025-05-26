@@ -1,21 +1,21 @@
-# Changelog
+# Catatan Perubahan
 
-All notable changes to this project will be documented in this file.
+Semua perubahan penting pada proyek ini akan didokumentasikan dalam file ini.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Format mengikuti [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+dan proyek ini mengikuti [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Belum Dirilis]
 
-### Added
-- Initial project setup.
+### Ditambahkan
+- Persiapan proyek awal.
 
 ## [0.1.0] - 2025-05-25
 
-### Added
-- First version of the application.
-- Support for Gemini, GPT, and Claude models via direct API implementation.
-- Support for enhanced Gemini integration via Google's ADK.
-- Tools for shell command execution, time checking, and GCP project management.
-- Improved documentation and testing coverage.
-- macOS compatibility verification.
+### Ditambahkan
+- Versi pertama aplikasi.
+- Dukungan untuk model Gemini, GPT, dan Claude melalui implementasi API langsung.
+- Dukungan untuk integrasi Gemini yang ditingkatkan melalui ADK Google.
+- Alat untuk eksekusi perintah shell, pengecekan waktu, dan manajemen proyek GCP.
+- Peningkatan dokumentasi dan cakupan pengujian.
+- Verifikasi kompatibilitas macOS.

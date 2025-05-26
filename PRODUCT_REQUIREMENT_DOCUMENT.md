@@ -1,49 +1,49 @@
-# Product Requirement Document: Infrabot-NLP
+# Dokumen Persyaratan Produk: Infrabot-NLP
 
-## 1. Introduction
+## 1. Pendahuluan
 
-Infrabot-NLP is a Command Line Interface (CLI) application designed to provide a unified and interactive interface for developers and operations engineers to leverage various Large Language Models (LLMs) for infrastructure-related tasks and general queries. It aims to simplify interactions with AI models by providing a consistent user experience and integrating useful tools for common operational needs.
+Infrabot-NLP adalah aplikasi Command Line Interface (CLI) yang dirancang untuk menyediakan antarmuka terpadu dan interaktif bagi pengembang dan insinyur operasi untuk memanfaatkan berbagai Model Bahasa Besar (LLM) untuk tugas-tugas terkait infrastruktur dan kueri umum. Tujuannya adalah untuk menyederhanakan interaksi dengan model AI dengan menyediakan pengalaman pengguna yang konsisten dan mengintegrasikan alat-alat yang berguna untuk kebutuhan operasional umum.
 
-## System Requirements
+## Persyaratan Sistem
 
-### Technical Requirements
-- Python 3.13 or later
-- macOS (primary supported platform)
-- Linux/Windows (secondary supported platforms)
-- 4GB RAM minimum, 8GB recommended
-- Internet connectivity for API access
+### Persyaratan Teknis
+- Python 3.13 atau yang lebih baru
+- macOS (platform utama yang didukung)
+- Linux/Windows (platform dengan dukungan sekunder)
+- RAM minimal 4GB, direkomendasikan 8GB
+- Koneksi internet untuk mengakses API
 
-### Dependencies
-- Core dependencies listed in requirements.txt
-- Development dependencies listed in requirements-dev.txt
-- API keys for supported AI providers
+### Dependensi
+- Dependensi inti yang tercantum dalam requirements.txt
+- Dependensi pengembangan yang tercantum dalam requirements-dev.txt
+- Kunci API untuk penyedia AI yang didukung
 
-## 2. Goals and Objectives
+## 2. Tujuan dan Sasaran
 
-*   **Unified AI Access**: Provide a single CLI to interact with multiple leading AI models (e.g., Google Gemini, OpenAI GPT series, Anthropic Claude).
-*   **Task Automation**: Enable users to perform specific tasks like shell command execution, GCP resource management, and time lookups through natural language commands processed by AI.
-*   **Enhanced Productivity**: Streamline workflows for developers and SREs by integrating AI assistance directly into their terminal environment.
-*   **Extensibility**: Design the system to be easily extensible with new AI models and new tools/capabilities.
-*   **User-Friendly CLI**: Offer an intuitive and easy-to-use command-line experience.
+*   **Akses AI Terpadu**: Menyediakan satu CLI untuk berinteraksi dengan berbagai model AI terkemuka (misalnya, Google Gemini, seri OpenAI GPT, Anthropic Claude).
+*   **Otomatisasi Tugas**: Memungkinkan pengguna untuk melakukan tugas-tugas tertentu seperti eksekusi perintah shell, manajemen sumber daya GCP, dan pencarian waktu melalui perintah bahasa alami yang diproses oleh AI.
+*   **Peningkatan Produktivitas**: Meningkatkan alur kerja untuk pengembang dan SRE dengan mengintegrasikan bantuan AI langsung ke dalam lingkungan terminal mereka.
+*   **Kemampuan Pengembangan**: Merancang sistem yang mudah diperluas dengan model AI baru dan alat/kemampuan baru.
+*   **CLI yang Ramah Pengguna**: Menawarkan pengalaman baris perintah yang intuitif dan mudah digunakan.
 
-## 3. Target Audience
+## 3. Target Pengguna
 
-*   **Software Developers**: For quick lookups, code generation/understanding assistance, and simple script execution.
-*   **DevOps Engineers / SREs**: For automating infrastructure tasks, querying cloud resources, and troubleshooting.
-*   **System Administrators**: For managing systems and executing commands with AI assistance.
-*   **AI Enthusiasts**: For exploring and comparing capabilities of different LLMs through a common interface.
+*   **Pengembang Perangkat Lunak**: Untuk pencarian cepat, bantuan pembuatan/pemahaman kode, dan eksekusi skrip sederhana.
+*   **Insinyur DevOps / SRE**: Untuk mengotomatisasi tugas infrastruktur, mengkueri sumber daya cloud, dan pemecahan masalah.
+*   **Administrator Sistem**: Untuk mengelola sistem dan mengeksekusi perintah dengan bantuan AI.
+*   **Pecinta AI**: Untuk mengeksplorasi dan membandingkan kemampuan berbagai LLM melalui antarmuka yang umum.
 
-## 4. Functional Requirements
+## 4. Persyaratan Fungsional
 
-### 4.1. Core AI Interaction
+### 4.1. Interaksi AI Inti
 
-*   **FR1.1 Multi-Model Support**: The application must support interaction with:
-    *   Google Gemini Pro and Gemini Ultra models (via direct API and ADK)
-    *   OpenAI GPT-4 Turbo and GPT-3.5 Turbo models (via direct API)
-    *   Anthropic Claude 3 and Claude 2.1 models (via direct API)
-*   **FR1.2 Natural Language Input**: Users shall be able to input queries and commands in natural language
-*   **FR1.3 AI Response Display**: The application must clearly display responses from the AI model
-*   **FR1.4 Model Fallback**: Implement automatic fallback to alternative models if primary model is unavailable
+*   **FR1.1 Dukungan Multi-Model**: Aplikasi harus mendukung interaksi dengan:
+    *   Model Google Gemini Pro dan Gemini Ultra (melalui API langsung dan ADK)
+    *   Model OpenAI GPT-4 Turbo dan GPT-3.5 Turbo (melalui API langsung)
+    *   Model Anthropic Claude 3 dan Claude 2.1 (melalui API langsung)
+*   **FR1.2 Input Bahasa Alami**: Pengguna harus dapat memasukkan kueri dan perintah dalam bahasa alami
+*   **FR1.3 Tampilan Respons AI**: Aplikasi harus menampilkan respons dari model AI dengan jelas
+*   **FR1.4 Fallback Model**: Menerapkan fallback otomatis ke model alternatif jika model utama tidak tersedia
 
 ### 4.2. Tool Integration
 

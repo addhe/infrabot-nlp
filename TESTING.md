@@ -1,52 +1,52 @@
-# Testing
+# Panduan Pengujian
 
-This document outlines the testing strategy and guidelines for the `infrabot-nlp` project.
+Dokumen ini menguraikan strategi dan pedoman pengujian untuk proyek `infrabot-nlp`.
 
-## Table of Contents
+## Daftar Isi
 
-- [Introduction](#introduction)
-- [Types of Tests](#types-of-tests)
-  - [Unit Tests](#unit-tests)
-  - [Integration Tests](#integration-tests)
-  - [End-to-End (E2E) Tests](#end-to-end-e2e-tests)
-- [Tools and Frameworks](#tools-and-frameworks)
-- [Running Tests](#running-tests)
-  - [Running Unit Tests](#running-unit-tests)
-  - [Running Integration Tests](#running-integration-tests)
-  - [Running All Tests](#running-all-tests)
-- [Test Coverage](#test-coverage)
-- [Writing Tests](#writing-tests)
-  - [General Guidelines](#general-guidelines)
-  - [Naming Conventions](#naming-conventions)
+- [Pendahuluan](#pendahuluan)
+- [Jenis-Jenis Pengujian](#jenis-jenis-pengujian)
+  - [Pengujian Unit](#pengujian-unit)
+  - [Pengujian Integrasi](#pengujian-integrasi)
+  - [Pengujian End-to-End (E2E)](#pengujian-end-to-end-e2e)
+- [Alat dan Kerangka Kerja](#alat-dan-kerangka-kerja)
+- [Menjalankan Pengujian](#menjalankan-pengujian)
+  - [Menjalankan Pengujian Unit](#menjalankan-pengujian-unit)
+  - [Menjalankan Pengujian Integrasi](#menjalankan-pengujian-integrasi)
+  - [Menjalankan Semua Pengujian](#menjalankan-semua-pengujian)
+- [Cakupan Pengujian](#cakupan-pengujian)
+- [Menulis Pengujian](#menulis-pengujian)
+  - [Panduan Umum](#panduan-umum)
+  - [Konvensi Penamaan](#konvensi-penamaan)
   - [Mocking](#mocking)
-- [Continuous Integration (CI)](#continuous-integration-ci)
-- [Reporting Bugs](#reporting-bugs)
+- [Integrasi Berkelanjutan (CI)](#integrasi-berkelanjutan-ci)
+- [Melaporkan Masalah](#melaporkan-masalah)
 
-## Introduction
+## Pendahuluan
 
-The purpose of testing in this project is to ensure the reliability, correctness, and robustness of the application. This document provides guidance on how to write, run, and maintain tests.
+Tujuan pengujian dalam proyek ini adalah untuk memastikan keandalan, kebenaran, dan ketangguhan aplikasi. Dokumen ini memberikan panduan tentang cara menulis, menjalankan, dan memelihara pengujian.
 
-## Types of Tests
+## Jenis-Jenis Pengujian
 
-We employ several types of tests to cover different aspects of the application:
+Kami menggunakan beberapa jenis pengujian untuk mencakup berbagai aspek aplikasi:
 
-### Unit Tests
+### Pengujian Unit
 
-- **Purpose**: To test individual components or functions in isolation.
-- **Location**: Typically located in a `tests/unit` directory alongside the code they are testing or within the module itself.
-- **Characteristics**: Fast, isolated, and mock external dependencies.
+- **Tujuan**: Menguji komponen atau fungsi individual secara terisolasi.
+- **Lokasi**: Biasanya terletak di direktori `tests/unit` di samping kode yang diuji atau di dalam modul itu sendiri.
+- **Karakteristik**: Cepat, terisolasi, dan menggunakan mock untuk dependensi eksternal.
 
-### Integration Tests
+### Pengujian Integrasi
 
-- **Purpose**: To test the interaction between multiple components or services. This includes testing interactions with external APIs (e.g., Google Gemini, OpenAI, GCP).
-- **Location**: Typically located in a `tests/integration` directory.
-- **Characteristics**: Slower than unit tests, may require external services to be available or mocked at a higher level.
+- **Tujuan**: Menguji interaksi antara beberapa komponen atau layanan. Termasuk pengujian interaksi dengan API eksternal (misalnya, Google Gemini, OpenAI, GCP).
+- **Lokasi**: Biasanya terletak di direktori `tests/integration`.
+- **Karakteristik**: Lebih lambat dibanding pengujian unit, mungkin memerlukan layanan eksternal yang tersedia atau dimock pada tingkat yang lebih tinggi.
 
-### End-to-End (E2E) Tests
+### Pengujian End-to-End (E2E)
 
-- **Purpose**: To test the entire application flow from the user's perspective, simulating real user scenarios. This involves running the CLI application with various inputs and verifying the output.
-- **Location**: Typically located in a `tests/e2e` directory.
-- **Characteristics**: Slowest type of test, requires the full application to be runnable.
+- **Tujuan**: Menguji alur aplikasi secara keseluruhan dari perspektif pengguna, mensimulasikan skenario pengguna nyata. Ini melibatkan menjalankan aplikasi CLI dengan berbagai masukan dan memverifikasi keluarannya.
+- **Lokasi**: Biasanya terletak di direktori `tests/e2e`.
+- **Karakteristik**: Jenis pengujian yang paling lambat, membutuhkan aplikasi penuh yang dapat dijalankan.
 
 ## Tools and Frameworks
 

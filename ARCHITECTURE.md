@@ -1,23 +1,23 @@
-# Architecture Document: Gemini-ChatGPT CLI
+# Dokumen Arsitektur: Gemini-ChatGPT CLI
 
-## 1. Introduction
+## 1. Pendahuluan
 
-This document outlines the architecture of the Gemini-ChatGPT CLI application, targeting Python 3.13+ environments. The application provides a unified command-line interface to interact with multiple AI models, including Google's Gemini, OpenAI's GPT models, and Anthropic's Claude. It supports various functionalities like executing shell commands, fetching time, and managing GCP projects.
+Dokumen ini menguraikan arsitektur aplikasi Gemini-ChatGPT CLI yang ditargetkan untuk lingkungan Python 3.13+. Aplikasi ini menyediakan antarmuka baris perintah terpadu untuk berinteraksi dengan berbagai model AI, termasuk Gemini dari Google, model GPT dari OpenAI, dan Claude dari Anthropic. Aplikasi ini mendukung berbagai fungsi seperti mengeksekusi perintah shell, mengambil waktu, dan mengelola proyek GCP.
 
-## System Requirements
+## Persyaratan Sistem
 
-- Python 3.13 or later
-- Primary support for macOS
-- Secondary support for Linux and Windows
-- Required dependencies as specified in requirements.txt
-- Development dependencies as specified in requirements-dev.txt
+- Python 3.13 atau yang lebih baru
+- Dukungan utama untuk macOS
+- Dukungan sekunder untuk Linux dan Windows
+- Dependensi yang diperlukan seperti yang ditentukan dalam requirements.txt
+- Dependensi pengembangan seperti yang ditentukan dalam requirements-dev.txt
 
-## 2. High-Level Architecture
+## 2. Arsitektur Tingkat Tinggi
 
-The application follows a modular architecture, primarily divided into two main implementation strategies:
+Aplikasi ini mengikuti arsitektur modular, terutama dibagi menjadi dua strategi implementasi utama:
 
-1.  **Direct API Implementation**: Interacts directly with the respective AI provider APIs.
-2.  **ADK (Agent Development Kit) Implementation**: Utilizes Google's ADK for a more integrated experience with Gemini, leveraging its specific capabilities.
+1.  **Implementasi API Langsung**: Berinteraksi langsung dengan API penyedia AI masing-masing.
+2.  **Implementasi ADK (Agent Development Kit)**: Memanfaatkan ADK Google untuk pengalaman yang lebih terintegrasi dengan Gemini, memanfaatkan kemampuan spesifiknya.
 
 ```
 +---------------------+      +-------------------------+      +-----------------------+
@@ -34,17 +34,17 @@ The application follows a modular architecture, primarily divided into two main 
                              +-----------------------+
 ```
 
-## 3. Key Components
+## 3. Komponen Utama
 
-### 3.1. CLI Interface (`run_agent.py`, `run_adk_agent.py`)
+### 3.1. Antarmuka CLI (`run_agent.py`, `run_adk_agent.py`)
 
-*   **Purpose**: Entry points for the application. They handle user input, initialize the appropriate agent, and manage the main interaction loop.
-*   **Responsibilities**:
-    *   Parse command-line arguments (if any).
-    *   Load environment variables and configurations (e.g., API keys).
-    *   Instantiate the selected agent (Direct API or ADK).
-    *   Process user commands and display responses.
-    *   Handle exit conditions.
+*   **Tujuan**: Titik masuk untuk aplikasi. Mereka menangani masukan pengguna, menginisialisasi agen yang sesuai, dan mengelola loop interaksi utama.
+*   **Tanggung Jawab**:
+    *   Mengurai argumen baris perintah (jika ada).
+    *   Memuat variabel lingkungan dan konfigurasi (misalnya, kunci API).
+    *   Membuat instance agen yang dipilih (API Langsung atau ADK).
+    *   Memproses perintah pengguna dan menampilkan respons.
+    *   Menangani kondisi keluar.
 
 ### 3.2. Agent Core Logic
 

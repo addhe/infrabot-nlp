@@ -1,51 +1,51 @@
-# Module Overview
+# Ikhtisar Modul
 
-This document provides an overview of the key modules and components within the `infrabot-nlp` project.
+Dokumen ini memberikan gambaran umum tentang modul dan komponen kunci dalam proyek `infrabot-nlp`.
 
-## System Requirements
+## Persyaratan Sistem
 
-- Python 3.13 or later
-- macOS (primary supported platform)
-- Linux/Windows (secondary supported platforms)
+- Python 3.13 atau yang lebih baru
+- macOS (platform utama yang didukung)
+- Linux/Windows (platform dengan dukungan sekunder)
 
-## Core Implementations
+## Implementasi Inti
 
-The project offers two main implementations for interacting with AI models:
+Proyek ini menawarkan dua implementasi utama untuk berinteraksi dengan model AI:
 
-1.  **Direct API Implementation (`my_cli_agent/`)**: This implementation interacts directly with the APIs of various AI providers (Google Gemini, OpenAI GPT, Anthropic Claude).
-2.  **ADK Implementation (`adk_cli_agent/`)**: This implementation utilizes Google's Agent Development Kit (ADK) for an enhanced and potentially more integrated experience, primarily with Google's Gemini models.
+1.  **Implementasi API Langsung (`my_cli_agent/`)**: Implementasi ini berinteraksi langsung dengan API dari berbagai penyedia AI (Google Gemini, OpenAI GPT, Anthropic Claude).
+2.  **Implementasi ADK (`adk_cli_agent/`)**: Implementasi ini memanfaatkan Agent Development Kit (ADK) dari Google untuk pengalaman yang lebih baik dan terintegrasi, terutama dengan model Gemini dari Google.
 
-## Directory Structure and Key Files
+## Struktur Direktori dan File Utama
 
-### 1. `my_cli_agent/` - Direct API Implementation
+### 1. `my_cli_agent/` - Implementasi API Langsung
 
-This directory contains the code for the direct API interaction agent.
+Direktori ini berisi kode untuk agen interaksi API langsung.
 
-*   **`agent.py`**: Main agent implementation with core functionality
-*   **`agent_new.py`**: Enhanced agent implementation with additional features and optimizations
-*   **`models.py`**: Pydantic models for request/response handling and tool definitions
-*   **`providers/`**: AI model provider implementations
-    *   `anthropic.py`: Anthropic Claude API integration
-    *   `base.py`: Base provider interface and common utilities
-    *   `gemini.py`: Google Gemini API integration
-    *   `openai.py`: OpenAI GPT API integration
-*   **`tools/`**: Agent capability implementations
-    *   `base.py`: Base tool classes and interfaces
-    *   `command_tools.py`: Shell command execution tools
-    *   `gcp_tools.py`: Google Cloud Platform integration tools
-    *   `terminal_tools.py`: Terminal interaction utilities
-    *   `time_tools.py`: Time-related functionality
+*   **`agent.py`**: Implementasi agen utama dengan fungsionalitas inti
+*   **`agent_new.py`**: Implementasi agen yang ditingkatkan dengan fitur dan pengoptimalan tambahan
+*   **`models.py`**: Model Pydantic untuk penanganan permintaan/respons dan definisi alat
+*   **`providers/`**: Implementasi penyedia model AI
+    *   `anthropic.py`: Integrasi API Anthropic Claude
+    *   `base.py`: Antarmuka penyedia dasar dan utilitas umum
+    *   `gemini.py`: Integrasi API Google Gemini
+    *   `openai.py`: Integrasi API OpenAI GPT
+*   **`tools/`**: Implementasi kemampuan agen
+    *   `base.py`: Kelas dan antarmuka alat dasar
+    *   `command_tools.py`: Alat eksekusi perintah shell
+    *   `gcp_tools.py`: Alat integrasi Google Cloud Platform
+    *   `terminal_tools.py`: Utilitas interaksi terminal
+    *   `time_tools.py`: Fungsi terkait waktu
 
-### 2. `adk_cli_agent/` - ADK Implementation
+### 2. `adk_cli_agent/` - Implementasi ADK
 
-This directory contains the code for the agent built using Google's Agent Development Kit.
+Direktori ini berisi kode untuk agen yang dibangun menggunakan Agent Development Kit (ADK) Google.
 
-*   **`agent.py`**: The main agent implementation leveraging ADK functionalities. This likely involves defining agent behavior, tools, and interaction flows as per ADK's framework.
-*   **`tools/`**: Similar to the direct API implementation, this sub-directory contains tool modules, but these are specifically designed and integrated for use with the ADK.
+*   **`agent.py`**: Implementasi agen utama yang memanfaatkan fungsionalitas ADK. Ini melibatkan definisi perilaku agen, alat, dan alur interaksi sesuai dengan kerangka kerja ADK.
+*   **`tools/`**: Mirip dengan implementasi API langsung, sub-direktori ini berisi modul alat, tetapi dirancang khusus dan terintegrasi untuk digunakan dengan ADK.
     *   `__init__.py`
-    *   `command_tools.py`: ADK-compatible tools for shell command execution.
-    *   `gcp_tools.py`: ADK-compatible tools for GCP interactions.
-    *   `time_tools.py`: ADK-compatible tools for time-related information.
+    *   `command_tools.py`: Alat yang kompatibel dengan ADK untuk eksekusi perintah shell.
+    *   `gcp_tools.py`: Alat yang kompatibel dengan ADK untuk interaksi GCP.
+    *   `time_tools.py`: Alat yang kompatibel dengan ADK untuk informasi terkait waktu.
 
 ### 3. Root Directory Files
 
