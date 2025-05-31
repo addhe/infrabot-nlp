@@ -55,9 +55,37 @@ The application must support the following tools, callable via AI understanding 
     *   **FR2.1.3**: Implement safety measures or confirmations for potentially destructive commands (Future consideration: User confirmation).
 *   **FR2.2 Time Lookup:**
     *   **FR2.2.1**: Allow users to ask for the current time in specified cities or timezones.
-*   **FR2.3 GCP Project Management (requires user authentication with GCP):**
-    *   **FR2.3.1**: List GCP projects. Users shall be able to list all projects or filter them by environment (e.g., dev, stg, prod) if such tagging/naming conventions are used or if "all" is specified as the environment.
-    *   **FR2.3.2**: Create new GCP projects, allowing specification of project ID, name, and organization ID.
+*   **FR2.3 Google Cloud Platform (GCP) Infrastructure Management (requires user authentication with GCP):**
+    *   **FR2.3.1 Project Management:**
+        *   List GCP projects with environment filtering (dev, stg, prod, all)
+        *   Create new GCP projects with project ID, name, and organization ID
+        *   Delete GCP projects with proper confirmation
+        *   Update project metadata and settings
+    *   **FR2.3.2 Network Infrastructure:**
+        *   Create, list, update, and delete VPCs (Virtual Private Clouds)
+        *   Create, list, update, and delete subnets within VPCs
+        *   Manage firewall rules and security policies
+        *   Configure network peering and interconnects
+    *   **FR2.3.3 Compute Resources:**
+        *   Manage Google Compute Engine (GCE) instances
+        *   Manage Google Kubernetes Engine (GKE) clusters
+        *   Configure load balancers and auto-scaling
+    *   **FR2.3.4 Storage and Database:**
+        *   Manage Cloud Storage buckets and objects
+        *   Configure Cloud SQL instances and databases
+        *   Manage Redis and Memcached instances
+    *   **FR2.3.5 Application Services:**
+        *   Deploy and manage Cloud Run services
+        *   Configure Cloud Functions
+        *   Manage Pub/Sub topics and subscriptions
+    *   **FR2.3.6 Security and Identity:**
+        *   Manage IAM policies and service accounts
+        *   Configure Google Secret Manager (GSM)
+        *   Handle encryption keys and certificates
+    *   **FR2.3.7 Monitoring and Operations:**
+        *   Configure logging and monitoring
+        *   Set up alerting policies
+        *   Manage deployment pipelines
 
 ### 4.3. Configuration
 
@@ -93,19 +121,39 @@ The application must support the following tools, callable via AI understanding 
 *   **NFR1.6 Extensibility**:
     *   The architecture should allow for the addition of new AI model providers with minimal changes to the core system.
     *   The architecture should allow for the easy addition of new tools and capabilities.
-*   **NFR1.7 Installation**:
+    *   GCP tools should follow a modular, service-based architecture for easy maintenance and extension.
+*   **NFR1.7 Maintainability (GCP Tools)**:
+    *   GCP tools should be organized by service category for easy navigation and maintenance.
+    *   Each GCP service should have its own module with standardized CRUD operations.
+    *   Common GCP utilities should be shared across modules to avoid code duplication.
+*   **NFR1.8 Installation**:
     *   The installation process using `pip` and a virtual environment should be straightforward.
     *   Docker-based deployment should be supported and functional.
 
 ## 6. Future Considerations / Potential Roadmap
 
+### 6.1 Infrastructure and Architecture
 *   **FC1. Advanced Context Management**: More sophisticated session history and context management.
 *   **FC2. Tool Discovery**: Mechanism for AI to discover available tools and their usage.
-*   **FC3. User Confirmation for Sensitive Operations**: Implement a confirmation step before executing potentially destructive shell commands or creating/modifying cloud resources.
-*   **FC4. Plugin Architecture for Tools**: A more formal plugin system for adding new tools.
-*   **FC5. Support for More Cloud Providers**: Extend toolset to support other cloud providers (e.g., AWS, Azure).
-*   **FC6. GUI Interface**: A web-based or desktop GUI as an alternative to the CLI.
-*   **FC7. More Sophisticated GCP Tools**: Tools for managing other GCP resources (e.g., GCE instances, GCS buckets).
-*   **FC8. Output Formatting**: Allow users to specify output formats for tool results (e.g., JSON, YAML, table).
-*   **FC9. Logging and Auditing**: Enhanced logging for debugging and auditing user commands and AI interactions.
-*   **FC10. Testing Framework**: Comprehensive unit and integration tests.
+*   **FC3. Plugin Architecture for Tools**: A more formal plugin system for adding new tools.
+*   **FC4. GCP Tools Modular Architecture**: Complete migration to service-based modular architecture for GCP tools.
+
+### 6.2 Security and Operations
+*   **FC5. User Confirmation for Sensitive Operations**: Implement a confirmation step before executing potentially destructive shell commands or creating/modifying cloud resources.
+*   **FC6. Enhanced Security**: Role-based access control and audit trails for GCP operations.
+*   **FC7. Logging and Auditing**: Enhanced logging for debugging and auditing user commands and AI interactions.
+
+### 6.3 Multi-Cloud and Integration
+*   **FC8. Support for More Cloud Providers**: Extend toolset to support other cloud providers (e.g., AWS, Azure).
+*   **FC9. Terraform Integration**: Support for Terraform configuration generation and management.
+*   **FC10. Kubernetes Integration**: Advanced Kubernetes cluster management and deployment tools.
+
+### 6.4 User Experience
+*   **FC11. GUI Interface**: A web-based or desktop GUI as an alternative to the CLI.
+*   **FC12. Output Formatting**: Allow users to specify output formats for tool results (e.g., JSON, YAML, table).
+*   **FC13. Interactive Wizards**: Step-by-step guided setup for complex infrastructure configurations.
+
+### 6.5 Quality and Testing
+*   **FC14. Testing Framework**: Comprehensive unit and integration tests (COMPLETED).
+*   **FC15. Performance Monitoring**: Built-in performance monitoring and optimization suggestions.
+*   **FC16. Configuration Validation**: Pre-deployment validation of infrastructure configurations.

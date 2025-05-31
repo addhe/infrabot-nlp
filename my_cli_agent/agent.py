@@ -32,6 +32,11 @@ from .tools.time_tools import get_current_time
 from .tools.command_tools import execute_command
 from .tools.gcp_tools import list_gcp_projects, create_gcp_project, delete_gcp_project, HAS_GCP_TOOLS
 
+# Import model providers
+from .providers.openai import OpenAIProvider
+from .providers.gemini import GeminiProvider
+from .providers.anthropic import AnthropicProvider
+
 # --- Type Definitions ---
 @dataclass
 class ChatHistory:
@@ -363,6 +368,10 @@ class Agent:
         """
         from my_cli_agent.tools.gcp_tools import create_gcp_project
         return create_gcp_project(project_id, name)
+        
+    def cleanup(self):
+        """Clean up any resources before exiting."""
+        pass
     
     def process_command(self, command: str) -> str:
         """
@@ -375,18 +384,42 @@ class Agent:
             The final response to show to the user
         """
         try:
-            # Get AI model's response
-            response = self.model_provider.send_message(command)
+            # First check for direct GCP commands in multiple languages
+            if self.has_gcp_tools:
+                command_lower = command.lower()
+                
+                # Match for GCP commands in different languages (English and Indonesian)
+                gcp_project_keywords = ["list projects", "show projects", "get projects", "gcp projects", 
+                                       "projects", "project", "gcp", "semua project", "semua gcp",
+                                       "list semua", "lihat semua", "tampilkan semua", "berapa projects", 
+                                       "projects yang saya", "milik", "miliki"]
+                
+                if any(keyword in command_lower for keyword in gcp_project_keywords):
+                    print(f"Executing GCP tool command: {command}")
+                    from my_cli_agent.tools.gcp_tools import execute_command as gcp_execute
+                    tool_result = gcp_execute(command)
+                    if tool_result.success:
+                        return f"{tool_result.result}"
+                    else:
+                        error_msg = tool_result.error_message or "Unknown error occurred"
+                        return f"Tool execution failed: {error_msg}"
             
-            # Check if we need to execute any tools
+            # Get AI model's response if no direct command match
+            response = self.model_provider.generate_response(command, [{"role": "user", "content": command}])
+            
+            # Check if we need to execute any tools based on response
             for tool_name, tool_module in self.tool_modules.items():
                 if tool_name in response.lower():
                     # Execute relevant tool function
-                    tool_result = tool_module.execute_command(command)
-                    if tool_result.success:
-                        return f"Tool execution result: {tool_result.result}"
-                    else:
-                        return f"Tool execution failed: {tool_result.error_message}"
+                    try:
+                        tool_result = tool_module.execute_command(command)
+                        if tool_result.success:
+                            return f"{tool_result.result}"
+                        else:
+                            error_msg = tool_result.error_message or "Unknown error occurred"
+                            return f"Tool execution failed: {error_msg}"
+                    except Exception as tool_error:
+                        return f"Error executing {tool_name} command: {str(tool_error)}"
             
             return response
             
@@ -395,8 +428,28 @@ class Agent:
 
 def main():
     """Main function to run the CLI interface."""
+    print("Starting agent...")
     try:
-        agent = Agent()
+        # Determine which provider to use based on available APIs and environment variables
+        provider = None
+        
+        # Try OpenAI first if available and configured
+        if HAS_OPENAI and os.getenv("OPENAI_API_KEY"):
+            provider = OpenAIProvider()
+        # Try Gemini next if available and configured
+        elif HAS_GEMINI and os.getenv("GOOGLE_API_KEY"):
+            provider = GeminiProvider()
+        # Try Anthropic last if available and configured
+        elif HAS_ANTHROPIC and os.getenv("ANTHROPIC_API_KEY"):
+            provider = AnthropicProvider()
+            
+        if provider is None:
+            # Fall back to mock provider if no API keys are configured
+            from .providers.mock import MockProvider
+            provider = MockProvider()
+            print("WARNING: No API keys configured. Using mock provider with limited functionality.")
+            
+        agent = Agent(provider)
         
         # Create welcome message based on available tools
         available_commands = [
@@ -413,13 +466,15 @@ def main():
         provider_name = {
             "gemini": "Google Gemini",
             "openai": "OpenAI",
-            "anthropic": "Anthropic Claude"
-        }.get(agent.provider_name, agent.provider_name.title())
+            "anthropic": "Anthropic Claude",
+            "mock": "Mock Provider (Demo Mode)"
+        }.get(agent.model_provider.__class__.__name__.replace('Provider', '').lower(), 
+              agent.model_provider.__class__.__name__)
         
         welcoming_text = f"""
         Welcome to Multi-LLM CLI Agent
         Using provider: {provider_name}
-        Using model: {agent.provider.model_id}
+        Using model: {agent.model_provider.model_id}
         Available commands:
         {chr(10).join(available_commands)}
         
@@ -434,7 +489,8 @@ def main():
                     print("Shutting down gracefully...")
                     agent.cleanup()
                     sys.exit(0)
-                agent.process_with_tools(user_input)
+                response = agent.process_command(user_input)
+                print(f"\n{response}")
             except KeyboardInterrupt:
                 print("\nExiting...")
                 agent.cleanup()

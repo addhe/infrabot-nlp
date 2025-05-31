@@ -1,11 +1,21 @@
 """GCP tools for project management."""
+import os
 import subprocess
 import json
+import sys
+import re
 from typing import Optional, List, Dict, Any
 import google.auth
 from google.cloud import resourcemanager_v3
 from google.cloud import resourcemanager as resource_manager
 from my_cli_agent.tools.base import ToolResult
+from my_cli_agent.tools.gcp.management.projects import ProjectManager, get_project_manager
+from my_cli_agent.tools.gcp.base.exceptions import GCPToolsError, GCPValidationError
+from my_cli_agent.tools.gcp.base.intent import IntentDetector
+from my_cli_agent.tools.gcp.base.auth import get_project_parent, validate_credentials
+
+# Define exported symbols
+__all__ = ['list_gcp_projects', 'create_gcp_project', 'delete_gcp_project', 'HAS_GCP_TOOLS']
 
 # Check if required GCP libraries are available
 try:
@@ -14,374 +24,536 @@ try:
 except ImportError:
     HAS_GCP_TOOLS = False
 
-# Initialize the client
-try:
-    client = resource_manager.Client()
-except Exception:
-    client = None
-
-def get_mock_projects(env: str) -> List[str]:
-    """Returns projects for a given environment.
-
-    Args:
-        env (str): The environment to filter projects by (dev/stg/prod/all)
-
-    Returns:
-        List[str]: List of project strings in format "Name (ID)"
+def execute_command(command: str) -> ToolResult:
     """
-    # Mock projects for testing with clear environment indicators
-    mock_projects = [
-        "Mock Dev Project (mock-dev-123)",
-        "Mock Staging Project (mock-stg-456)",
-        "Mock Production Project (mock-prod-789)",
-        "Mock Shared Services (mock-shared-001)",
-        "Mock Monitoring (mock-monitoring-001)",
-        "Mock Development (mock-dev-124)",
-        "Mock Staging 2 (mock-staging-457)",
-        "Mock Production 2 (mock-production-790)"
-    ]
+    Execute a GCP-related command.
     
-    env = env.lower()
-    if env == 'all':
-        return mock_projects
-            
-    # Map environment to keywords
-    env_keywords = {
-        'dev': ['-dev-', 'development'],
-        'stg': ['-stg-', '-staging'],
-        'prod': ['-prod-', '-production'],
-        'invalid': ['invalid']  # Special case for testing invalid env
-    }
-            
-    keywords = env_keywords.get(env, [env])
-    filtered = [p for p in mock_projects if any(kw in p.lower() for kw in keywords)]
-        
-    # Special case for testing invalid environment
-    if env == 'invalid':
-        return [f"No projects matching environment: {env}"]
-            
-    return filtered if filtered else [f"No projects found matching environment: {env}"]
-
-def list_gcp_projects(env: str = 'all') -> ToolResult:
-    """List all GCP projects.
-
     Args:
-        env (str, optional): Environment to filter projects by (dev/stg/prod/all). Defaults to 'all'.
-
+        command (str): The command to execute
+        
     Returns:
-        ToolResult: Contains the list of projects or error information
+        ToolResult: Contains the command result or error information
     """
-    # Handle test environment or missing dependencies
-    if not HAS_GCP_TOOLS or not client:
-        # For test cases checking missing dependencies or credentials
-        if env == 'missing-deps':
-            return ToolResult(
-                success=False,
-                result="Missing required GCP dependencies. Please install google-cloud-resource-manager and google-auth.",
-                error_message="Missing GCP dependencies"
-            )
-            
-        # For test cases checking missing credentials
-        if env == 'missing-creds':
-            return ToolResult(
-                success=False,
-                result="Could not automatically determine credentials. Please run 'gcloud auth application-default login'.",
-                error_message="Missing credentials"
-            )
-            
-        # For test cases checking response format
-        if env == 'format-test':
-            mock_projects = [
-                "Test Format 1 (test-format-1)",
-                "Test Format 2 (test-format-2)"
-            ]
-            return ToolResult(
-                success=True,
-                result=f"Found {len(mock_projects)} projects in the {env} environment (via mock):\n- " + "\n- ".join(mock_projects),
-                error_message=None
-            )
-            
-        # Default mock response for other test cases
-        mock_projects = get_mock_projects(env)
-        if 'No projects found' in mock_projects[0] or 'No projects matching' in mock_projects[0]:
-            return ToolResult(
-                success=True,
-                result=f"Found 0 projects in the {env} environment (via mock).",
-                error_message=None
-            )
-        return ToolResult(
-            success=True,
-            result=f"Found {len(mock_projects)} projects in the {env} environment (via mock):\n- " + "\n- ".join(mock_projects),
-            error_message=None
-        )
+    print(f"Executing command with intent detection: {command}")
+    command = command.lower().strip()
     
     try:
-        # Try using the Resource Manager API first
-        try:
-            credentials, _ = google.auth.default()
-            client_v3 = resourcemanager_v3.ProjectsClient(credentials=credentials)
-            
-            # List all projects
-            projects = list(client_v3.search_projects())
-            
-            # Filter projects by environment
-            filtered_projects = []
-            for project in projects:
-                project_name = project.display_name or project.project_id
-                project_str = f"{project_name} ({project.project_id})"
-                
-                # Simple environment filtering based on project ID
-                if env == 'all' or f'-{env}' in project.project_id or f'{env}-' in project.project_id:
-                    filtered_projects.append(project_str)
-            
-            if not filtered_projects:
-                return ToolResult(
-                    success=True,
-                    result=f"No projects found matching environment: {env}",
-                    error_message=None
-                )
-            
+        project_manager = get_project_manager()
+        
+        # Detect command intent
+        intent, confidence, params = IntentDetector.detect_intent(command)
+        print(f"Detected intent: {intent}, confidence: {confidence}, params: {params}")
+        
+        if not intent:
             return ToolResult(
-                success=True,
-                result=f"Found {len(filtered_projects)} projects in the {env} environment:\n- " + "\n- ".join(filtered_projects),
-                error_message=None
+                success=False,
+                result=("Unknown GCP command. Available commands:\n"
+                       "- List projects: 'list gcp projects [dev/stg/prod/all]'\n"
+                       "- Create project: 'create gcp project <project-id>' or 'create multiple projects <id1>, <id2>'\n"
+                       "- Delete project: 'delete gcp project <project-id>' or 'delete projects <id1>, <id2>'")
             )
             
-        except Exception as api_error:
-            # Fall back to gcloud CLI if API fails
-            try:
-                cmd = ['gcloud', 'projects', 'list', '--format=value(name,projectId)', '--sort-by=projectId']
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
-                
-                # Parse the output
-                projects = []
-                for line in result.stdout.strip().split('\n'):
-                    if not line.strip():
-                        continue
-                    parts = line.strip().split()
-                    if len(parts) >= 2:
-                        name = ' '.join(parts[:-1])
-                        project_id = parts[-1]
-                        projects.append(f"{name} ({project_id})")
-                
-                # Filter by environment if needed
-                if env != 'all':
-                    projects = [p for p in projects if 
-                              f'-{env}' in p.lower() or 
-                              f'{env}-' in p.lower() or
-                              f' {env} ' in p.lower()]
-                
-                if not projects:
-                    return ToolResult(
-                        success=True,
-                        result=f"No projects found matching environment: {env}",
-                        error_message=None
-                    )
-                
-                return ToolResult(
-                    success=True,
-                    result=f"Found {len(projects)} projects in the {env} environment (via gcloud):\n- " + "\n- ".join(projects),
-                    error_message=None
-                )
-                
-            except subprocess.CalledProcessError as cli_error:
+        if confidence < 0.6:
+            suggestions = []
+            if "crate" in command:
+                suggestions.append('"create project"')
+            if "delte" in command:
+                suggestions.append('"delete project"')
+            if suggestions:
                 return ToolResult(
                     success=False,
-                    result=f"Failed to list projects via gcloud CLI: {cli_error.stderr}",
-                    error_message=str(cli_error)
+                    result=f"Did you mean {' or '.join(suggestions)}? Please use the correct format."
                 )
         
+        try:
+            # Execute based on detected intent
+            if intent == "list_projects":
+                return list_gcp_projects(params.get("environment", "all"), project_manager)
+                
+            elif intent == "create_project":
+                if "project_ids" in params:
+                    return create_gcp_project(
+                        project_ids=params["project_ids"],
+                        name=params.get("project_name"),
+                        project_manager=project_manager
+                    )
+                elif "project_id" in params:
+                    return create_gcp_project(
+                        project_id=params["project_id"],
+                        name=params.get("project_name"),
+                        project_manager=project_manager
+                    )
+                else:
+                    return ToolResult(
+                        success=False,
+                        result="Project ID not specified. Please use: create gcp project <project-id> [project name]"
+                    )
+                    
+            elif intent == "delete_project":
+                if "project_ids" in params:
+                    return delete_gcp_project(
+                        project_ids=params["project_ids"],
+                        environment=params.get("environment"),
+                        is_bulk=True,
+                        project_manager=project_manager
+                    )
+                elif "project_id" in params:
+                    return delete_gcp_project(
+                        project_id=params["project_id"],
+                        project_manager=project_manager
+                    )
+                else:
+                    return ToolResult(
+                        success=False,
+                        result="Project ID not specified. Please use: delete gcp project <project-id>"
+                    )
+            
+        except Exception as op_error:
+            print(f"Operation error: {str(op_error)}")
+            raise
+        
+    except GCPToolsError as e:
+        print(f"GCP Tools error: {str(e)}")
+        return ToolResult(
+            success=False,
+            result=f"GCP operation failed: {str(e)}",
+            error_message=str(e)
+        )
     except Exception as e:
+        print(f"Unexpected error in execute_command: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return ToolResult(
+            success=False,
+            result=f"Unexpected error: {str(e)}",
+            error_message=str(e)
+        )
+
+def list_gcp_projects(env: str = 'all', project_manager: Optional[ProjectManager] = None) -> ToolResult:
+    """List GCP projects with their status."""
+    try:
+        projects_data = []
+        
+        # Try using gcloud CLI for listing projects
+        try:
+            import subprocess
+            result = subprocess.run(
+                ['gcloud', 'projects', 'list', '--format=json'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            if result.stdout:
+                projects = json.loads(result.stdout)
+                for project in projects:
+                    project_id = project.get('projectId', '')
+                    project_name = project.get('name', '')
+                    lifecycle_state = project.get('lifecycleState', 'UNKNOWN')
+                    
+                    # Filter by environment if specified
+                    if env.lower() != 'all':
+                        if env.lower() not in project_id.lower() and env.lower() not in project_name.lower():
+                            continue
+                            
+                    projects_data.append({
+                        'id': project_id,
+                        'name': project_name,
+                        'state': lifecycle_state
+                    })
+                    
+        except Exception as e:
+            print(f"Failed to list projects via gcloud: {e}")
+            return ToolResult(
+                success=False,
+                result="Failed to retrieve project list",
+                error_message=str(e)
+            )
+
+        if not projects_data:
+            return ToolResult(
+                success=True,
+                result=f"No projects found in the {env} environment",
+                error_message=None
+            )
+
+        # Format output
+        output = [f"\nFound {len(projects_data)} projects in the {env} environment:"]
+        for proj in projects_data:
+            status_indicator = "🔴" if proj['state'] == 'DELETE_REQUESTED' or proj['state'] == 'DELETE_IN_PROGRESS' else \
+                             "⚫" if proj['state'] == 'INACTIVE' else \
+                             "🟢" if proj['state'] == 'ACTIVE' else "⚪"
+            
+            output.append(f"{status_indicator} {proj['name']} ({proj['id']}) - {proj['state']}")
+
+        # Add legend
+        output.append("\nStatus Legend:")
+        output.append("🟢 ACTIVE")
+        output.append("⚫ INACTIVE")
+        output.append("🔴 DELETING")
+        output.append("⚪ UNKNOWN")
+
+        return ToolResult(
+            success=True,
+            result="\n".join(output),
+            error_message=None
+        )
+
+    except Exception as e:
+        print(f"Error in list_gcp_projects: {e}")
         return ToolResult(
             success=False,
             result=f"Failed to list projects: {str(e)}",
             error_message=str(e)
         )
 
-# For backward compatibility
-list_projects = list_gcp_projects
-
-# Export the functions that are used by other modules
-__all__ = ['list_gcp_projects', 'create_gcp_project', 'delete_gcp_project', 'HAS_GCP_TOOLS']
-
-def _filter_projects_by_env(projects: List[str], env: str) -> List[str]:
-    """Filter projects by environment based on naming conventions.
-
-    Args:
-        projects: List of project strings in format "Name (ID)"
-        env: Environment to filter by (dev/stg/prod/all)
-
-    Returns:
-        Filtered list of projects
-    """
-    if env.lower() == 'all':
-        return projects
-            
-    env = env.lower()
-    env_keywords = {
-        'dev': ['dev', 'development'],
-        'stg': ['stg', 'stag', 'staging'],
-        'prod': ['prod', 'prd', 'production']
-    }
-    
-    # Get keywords for the requested environment
-    keywords = env_keywords.get(env, [env])
-    filtered = []
-    
-    for project in projects:
-        project_lower = project.lower()
-        # Check if any of the keywords match in the project name or ID
-        if any(keyword in project_lower for keyword in keywords):
-            filtered.append(project)
-                
-    return filtered if filtered else [f"No projects found matching environment: {env}"]
-
-def create_gcp_project(project_id: str, name: Optional[str] = None) -> ToolResult:
-    """Create a new GCP project.
-
-    Args:
-        project_id (str): The project ID to create (can be in format 'id,name,org')
-        name (str, optional): The display name for the project. Defaults to project_id.
-
-    Returns:
-        ToolResult: Contains the result of the operation or error information
-    """
-    # Input validation first
-    if not project_id:
-        return ToolResult(
-            success=False,
-            result="Project ID cannot be empty",
-            error_message="Invalid project ID format"
-        )
-            
-    # Check for test environment or missing dependencies
-    if not HAS_GCP_TOOLS or not client:
-        # Handle test cases for missing dependencies
-        if project_id == "missing-deps":
-            return ToolResult(
-                success=False,
-                result="Missing required GCP dependencies",
-                error_message="Missing GCP dependencies"
+def create_gcp_project(
+    project_id: str = None,
+    project_ids: List[str] = None,
+    name: str = None,
+    project_manager: Optional[ProjectManager] = None
+) -> ToolResult:
+    """Create one or more GCP projects."""
+    try:
+        if not validate_credentials(require_org=False):
+            raise GCPToolsError(
+                "Failed to validate credentials. Please ensure you have valid credentials "
+                "configured either through gcloud auth or a service account key."
             )
-                
-        # Handle test cases for missing credentials
-        if project_id == "missing-creds":
-            return ToolResult(
-                success=False,
-                result="Could not determine credentials",
-                error_message="Missing credentials"
-            )
-                
-        # For test projects, simulate success
-        if 'test-' in project_id or 'project' in project_id:
-            # Extract name if provided in project_id
-            parts = [p.strip() for p in project_id.split(',')]
-            project_id = parts[0]
-            display_name = parts[1] if len(parts) > 1 and parts[1] else project_id
-                
-            # Handle organization validation test case
-            if len(parts) > 2 and 'invalid' in parts[2]:
-                return ToolResult(
-                    success=False,
-                    result=f"Invalid organization format: {parts[2]}",
-                    error_message="Invalid organization ID format. Must be 'organizations/123' or folder/123"
-                )
-                
-            # Handle specific test case for input validation
-            if 'invalid' in project_id or any(c.isspace() for c in project_id):
-                return ToolResult(
-                    success=False,
-                    result=f"Invalid project ID: {project_id}",
-                    error_message="Invalid project ID format"
-                )
+
+        # Handle bulk creation
+        if project_ids:
+            results = []
+            success_count = 0
+            errors = []
+            
+            print(f"\nCreating {len(project_ids)} projects:")
+            for pid in project_ids:
+                print(f"  - {pid}")
+            
+            for pid in project_ids:
+                try:
+                    # Validate project ID format
+                    if not re.match(r'^[a-z][a-z0-9-]*$', pid):
+                        raise ValueError(
+                            f"Invalid project ID '{pid}'. Project ID must start with a letter "
+                            "and can only contain lowercase letters, numbers, and hyphens"
+                        )
                     
+                    # Generate display name from project ID if not provided
+                    display_name = name or pid.replace('-', ' ').title()
+                    print(f"\nCreating project {pid}...")
+                    
+                    import subprocess
+                    result = subprocess.run(
+                        ['gcloud', 'projects', 'create', pid, f'--name={display_name}', '--format=json'],
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    
+                    results.append(f"Successfully created project {display_name} ({pid})")
+                    success_count += 1
+                    
+                except subprocess.CalledProcessError as e:
+                    error_msg = e.stderr if e.stderr else str(e)
+                    if "ALREADY_EXISTS" in error_msg:
+                        error_msg = f"Project ID '{pid}' already exists"
+                    elif "INVALID_ARGUMENT" in error_msg:
+                        error_msg = f"Invalid project ID '{pid}'"
+                    results.append(f"Failed to create {pid}: {error_msg}")
+                    errors.append(error_msg)
+                except ValueError as e:
+                    results.append(f"Failed to create {pid}: {str(e)}")
+                    errors.append(str(e))
+
+            # Prepare summary
+            summary = "\n".join(results)
+            if success_count == len(project_ids):
+                status = "All projects created successfully"
+            elif success_count > 0:
+                status = f"{success_count} out of {len(project_ids)} projects created successfully"
+            else:
+                status = "Failed to create any projects"
+
             return ToolResult(
-                success=True,
-                result=f"Project '{display_name}' ({project_id}) created successfully.",
-                error_message=None
+                success=success_count > 0,
+                result=f"{status}\n\n{summary}",
+                error_message="\n".join(errors) if errors else None
             )
-            
-        # For CLI fallback test
-        if 'cli-project' in project_id:
-            return ToolResult(
-                success=True,
-                result=f"Project '{name or project_id}' ({project_id}) created successfully via gcloud CLI.",
-                error_message=None
-            )
+
+        # Handle single project creation
+        elif project_id:
+            try:
+                # Validate project ID format
+                if not re.match(r'^[a-z][a-z0-9-]*$', project_id):
+                    raise ValueError(
+                        "Project ID must start with a letter and can only contain "
+                        "lowercase letters, numbers, and hyphens"
+                    )
                 
+                # Generate display name from project ID if not provided
+                display_name = name or project_id.replace('-', ' ').title()
+                print(f"\nCreating project {project_id}...")
+                
+                import subprocess
+                result = subprocess.run(
+                    ['gcloud', 'projects', 'create', project_id, f'--name={display_name}', '--format=json'],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                
+                return ToolResult(
+                    success=True,
+                    result=f"Successfully created project {display_name} ({project_id})",
+                    error_message=None
+                )
+                
+            except subprocess.CalledProcessError as e:
+                error_msg = e.stderr if e.stderr else str(e)
+                if "ALREADY_EXISTS" in error_msg:
+                    error_msg = f"Project ID '{project_id}' already exists"
+                elif "INVALID_ARGUMENT" in error_msg:
+                    error_msg = f"Invalid project ID format"
+                return ToolResult(
+                    success=False,
+                    result=f"Failed to create project: {error_msg}",
+                    error_message=error_msg
+                )
+            except ValueError as e:
+                return ToolResult(
+                    success=False,
+                    result=f"Failed to create project: {str(e)}",
+                    error_message=str(e)
+                )
+        else:
+            return ToolResult(
+                success=False,
+                result="No project ID specified",
+                error_message="Project ID is required"
+            )
+
+    except Exception as e:
         return ToolResult(
             success=False,
-            result="GCP client not available in test environment",
-            error_message="GCP client not available"
+            result=f"Unexpected error during project creation: {str(e)}",
+            error_message=str(e)
         )
 
-    # Input validation for production
-    if not all(c.isalnum() or c == '-' for c in project_id):
-        return ToolResult(
-            success=False,
-            result=f"Invalid project ID: {project_id}. Project ID must contain only letters, numbers, or hyphens.",
-            error_message="Invalid project ID format"
-        )
+def delete_gcp_project(
+    project_id: str = None,
+    project_ids: List[str] = None,
+    environment: str = None,
+    is_bulk: bool = False,
+    project_manager: Optional[ProjectManager] = None
+) -> ToolResult:
+    """Delete one or more GCP projects."""
+    try:
+        if not validate_credentials(require_org=False):
+            raise GCPToolsError(
+                "Failed to validate credentials. Please ensure you have valid credentials "
+                "configured either through gcloud auth or a service account key."
+            )
+        
+        # Handle bulk deletion
+        if project_ids or is_bulk:
+            target_projects = project_ids or [project_id]
+            if not target_projects:
+                return ToolResult(
+                    success=False,
+                    result="No projects specified for deletion",
+                    error_message="No projects specified"
+                )
 
-    if not name:
-        name = project_id
+            # Get user confirmation
+            confirm_msg = f"\nWARNING: You are about to delete {len(target_projects)} projects:\n"
+            for pid in target_projects:
+                confirm_msg += f"  - {pid}\n"
+            confirm_msg += "\nAre you sure you want to continue? [y/N]: "
             
-    # In a real implementation, we would create the project here
-    return ToolResult(
-        success=True,
-        result=f"Project '{name}' ({project_id}) created successfully.",
-        error_message=None
-    )
+            if input(confirm_msg).lower() not in ['y', 'yes']:
+                return ToolResult(
+                    success=True,
+                    result="Bulk deletion cancelled by user",
+                    error_message=None
+                )
 
-def delete_gcp_project(project_id: str) -> ToolResult:
-    """Delete a GCP project.
+            # Process each project
+            results = []
+            success_count = 0
+            errors = []
+            
+            for pid in target_projects:
+                try:
+                    import subprocess
+                    result = subprocess.run(
+                        ['gcloud', 'projects', 'delete', pid, '--quiet'],
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    results.append(f"Successfully deleted project {pid}")
+                    success_count += 1
+                except subprocess.CalledProcessError as e:
+                    error_msg = e.stderr if e.stderr else str(e)
+                    if "PROJECT_DELETE_INACTIVE" in error_msg:
+                        error_msg = f"Project {pid} is inactive and cannot be deleted"
+                    elif "INVALID_ARGUMENT" in error_msg:
+                        error_msg = f"Invalid project ID format: {pid}"
+                    elif "NOT_FOUND" in error_msg:
+                        error_msg = f"Project {pid} not found"
+                    results.append(f"Failed to delete {pid}: {error_msg}")
+                    errors.append(error_msg)
 
+            # Prepare summary
+            summary = "\n".join(results)
+            if success_count == len(target_projects):
+                status = "All projects deleted successfully"
+            elif success_count > 0:
+                status = f"{success_count} out of {len(target_projects)} projects deleted successfully"
+            else:
+                status = "Failed to delete any projects"
+
+            return ToolResult(
+                success=success_count > 0,
+                result=f"{status}\n\n{summary}",
+                error_message="\n".join(errors) if errors else None
+            )
+
+        # Handle single project deletion
+        else:
+            if not project_id:
+                return ToolResult(
+                    success=False,
+                    result="Project ID not specified",
+                    error_message="Project ID is required"
+                )
+
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ['gcloud', 'projects', 'delete', project_id, '--quiet'],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                return ToolResult(
+                    success=True,
+                    result=f"Project {project_id} deleted successfully",
+                    error_message=None
+                )
+            except subprocess.CalledProcessError as e:
+                error_msg = e.stderr if e.stderr else str(e)
+                if "PROJECT_DELETE_INACTIVE" in error_msg:
+                    error_msg = f"Project {project_id} is inactive and cannot be deleted"
+                elif "INVALID_ARGUMENT" in error_msg:
+                    error_msg = f"Invalid project ID format: {project_id}"
+                elif "NOT_FOUND" in error_msg:
+                    error_msg = f"Project {project_id} not found"
+                return ToolResult(
+                    success=False,
+                    result=f"Failed to delete project: {error_msg}",
+                    error_message=error_msg
+                )
+
+    except Exception as e:
+        return ToolResult(
+            success=False,
+            result=f"Unexpected error during project deletion: {str(e)}",
+            error_message=str(e)
+        )
+
+def confirm_bulk_operation(operation, items):
+    """Get user confirmation for bulk operations.
+    
     Args:
-        project_id (str): The project ID to delete
-
+        operation (str): The operation being performed (e.g., "delete")
+        items (list): List of items being affected
+    
     Returns:
-        ToolResult: Contains the result of the operation or error information
+        bool: True if user confirms, False otherwise
     """
-    # Input validation
-    if not project_id or not all(c.isalnum() or c == '-' for c in project_id):
+    print(f"\nWARNING: You are about to {operation} {len(items)} projects:")
+    for item in items:
+        print(f"  - {item}")
+    response = input("\nAre you sure you want to continue? [y/N]: ")
+    return response.lower() in ['y', 'yes']
+
+def _check_project_environment(project_id: str, environment: str) -> bool:
+    """Check if a project belongs to the specified environment.
+    
+    Args:
+        project_id (str): The project ID to check
+        environment (str): The environment to check against (dev/stg/prod)
+        
+    Returns:
+        bool: True if the project belongs to the specified environment
+    """
+    env_lower = environment.lower()
+    pid_lower = project_id.lower()
+    
+    if env_lower in ['dev', 'development']:
+        return any(term in pid_lower for term in ['dev', 'development'])
+    elif env_lower in ['stg', 'staging']:
+        return any(term in pid_lower for term in ['stg', 'staging'])
+    elif env_lower in ['prod', 'production']:
+        return any(term in pid_lower for term in ['prod', 'production'])
+    return True  # If no environment specified or unknown environment
+
+def reactivate_gcp_project(project_id: str) -> ToolResult:
+    """Reactivate an inactive GCP project.
+    
+    Args:
+        project_id (str): The ID of the project to reactivate
+        
+    Returns:
+        ToolResult: Contains the result of the reactivation attempt
+    """
+    try:
+        import subprocess
+        
+        # First check if project is actually inactive
+        result = subprocess.run(
+            ['gcloud', 'projects', 'describe', project_id, '--format=json'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        if result.stdout:
+            project_info = json.loads(result.stdout)
+            if project_info.get('lifecycleState') != 'INACTIVE':
+                return ToolResult(
+                    success=False,
+                    result=f"Project {project_id} is not inactive (current state: {project_info.get('lifecycleState')})",
+                    error_message="Project is not in INACTIVE state"
+                )
+        
+        # Try to reactivate the project
+        result = subprocess.run(
+            ['gcloud', 'projects', 'undelete', project_id],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        return ToolResult(
+            success=True,
+            result=f"Successfully reactivated project {project_id}",
+            error_message=None
+        )
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr if e.stderr else str(e)
         return ToolResult(
             success=False,
-            result=f"Invalid project ID: {project_id}",
-            error_message="Invalid project ID format"
+            result=f"Failed to reactivate project {project_id}: {error_msg}",
+            error_message=error_msg
         )
-
-    # Handle test environment
-    if not HAS_GCP_TOOLS or not client:
-        # For test projects, simulate success
-        if 'test-' in project_id:
-            return ToolResult(
-                success=True,
-                result=f"Project '{project_id}' deleted successfully.",
-                error_message=None
-            )
-            
-        # For CLI fallback test
-        if 'cli-project' in project_id:
-            return ToolResult(
-                success=True,
-                result=f"Project '{project_id}' deleted successfully via gcloud CLI.",
-                error_message=None
-            )
-            
+    except Exception as e:
         return ToolResult(
             success=False,
-            result="GCP client not available in test environment",
-            error_message="GCP client not available"
+            result=f"Unexpected error while reactivating project {project_id}: {str(e)}",
+            error_message=str(e)
         )
-
-    # In a real implementation, we would delete the project here
-    return ToolResult(
-        success=True,
-        result=f"Project '{project_id}' deleted successfully.",
-        error_message=None
-    )
