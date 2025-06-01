@@ -172,3 +172,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Credentials and secrets
+credentials/*.json
+credentials/*.key
+credentials/gcp-service-account-key*
+!credentials/README.md
