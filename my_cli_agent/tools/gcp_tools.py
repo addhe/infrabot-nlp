@@ -173,25 +173,52 @@ def list_gcp_projects(env: str = 'all', project_manager: Optional[ProjectManager
         if not projects_data:
             return ToolResult(
                 success=True,
-                result=f"No projects found in the {env} environment",
+                result=f"Tidak ada proyek ditemukan di environment {env}",  # No projects found in environment
                 error_message=None
             )
 
+        # Count states
+        active_count = sum(1 for p in projects_data if p['state'] == 'ACTIVE')
+        pending_count = sum(1 for p in projects_data if p['state'] in ['DELETE_REQUESTED', 'DELETE_IN_PROGRESS'])
+        
         # Format output
-        output = [f"\nFound {len(projects_data)} projects in the {env} environment:"]
-        for proj in projects_data:
-            status_indicator = "🔴" if proj['state'] == 'DELETE_REQUESTED' or proj['state'] == 'DELETE_IN_PROGRESS' else \
-                             "⚫" if proj['state'] == 'INACTIVE' else \
-                             "🟢" if proj['state'] == 'ACTIVE' else "⚪"
-            
-            output.append(f"{status_indicator} {proj['name']} ({proj['id']}) - {proj['state']}")
+        output = [f"\nDitemukan {len(projects_data)} proyek total ({active_count} aktif, {pending_count} menunggu penghapusan):"]
+        
+        # Active projects
+        active_projects = [p for p in projects_data if p['state'] == 'ACTIVE']
+        if active_projects:
+            output.append("\nProyek Aktif:") # Active Projects
+            for proj in active_projects:
+                output.append(f"🟢 {proj['name']} ({proj['id']}) - AKTIF")
+                
+        # Inactive projects
+        inactive_projects = [p for p in projects_data if p['state'] == 'INACTIVE']
+        if inactive_projects:
+            output.append("\nProyek Tidak Aktif:") # Inactive Projects
+            for proj in inactive_projects:
+                output.append(f"⚫ {proj['name']} ({proj['id']}) - TIDAK AKTIF")
+                
+        # Projects being deleted
+        deleting_projects = [p for p in projects_data if p['state'] in ['DELETE_REQUESTED', 'DELETE_IN_PROGRESS']]
+        if deleting_projects:
+            output.append("\nProyek Menunggu Penghapusan:") # Projects Pending Deletion
+            for proj in deleting_projects:
+                status = "MENUNGGU PENGHAPUSAN - Akan dihapus permanen dalam 30 hari" if proj['state'] == 'DELETE_REQUESTED' else "SEDANG DIHAPUS"
+                output.append(f"🔴 {proj['name']} ({proj['id']}) - {status}")
+                
+        # Unknown state projects
+        unknown_projects = [p for p in projects_data if p['state'] not in ['ACTIVE', 'INACTIVE', 'DELETE_REQUESTED', 'DELETE_IN_PROGRESS']]
+        if unknown_projects:
+            output.append("\nProyek Status Tidak Diketahui:") # Projects with Unknown Status
+            for proj in unknown_projects:
+                output.append(f"⚪ {proj['name']} ({proj['id']}) - TIDAK DIKETAHUI: {proj['state']}")
 
         # Add legend
-        output.append("\nStatus Legend:")
-        output.append("🟢 ACTIVE")
-        output.append("⚫ INACTIVE")
-        output.append("🔴 DELETING")
-        output.append("⚪ UNKNOWN")
+        output.append("\nLegenda Status:")
+        output.append("🟢 AKTIF")
+        output.append("⚫ TIDAK AKTIF")
+        output.append("🔴 MENGHAPUS")
+        output.append("⚪ TIDAK DIKETAHUI")
 
         return ToolResult(
             success=True,
@@ -203,7 +230,7 @@ def list_gcp_projects(env: str = 'all', project_manager: Optional[ProjectManager
         print(f"Error in list_gcp_projects: {e}")
         return ToolResult(
             success=False,
-            result=f"Failed to list projects: {str(e)}",
+            result=f"Gagal menampilkan daftar proyek: {str(e)}",  # Failed to list projects
             error_message=str(e)
         )
 

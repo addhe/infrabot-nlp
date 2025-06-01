@@ -27,7 +27,11 @@ class IntentDetector:
                 r"ada.*berapa.*projects?",
                 r"cek.*projects?",
                 r"project.*apa.*(?:saja|aja).*(?:yang|yg).*(?:ada|dimiliki|punya)",
-                r"tolong.*(?:tampilkan|lihat|tunjukkan).*projects?"
+                r"tolong.*(?:tampilkan|lihat|tunjukkan).*projects?",
+                # New patterns for Indonesian
+                r"(?:project|projects?).*(?:yang|yg).*(?:saya|aku|kita).*(?:miliki|punya)",
+                r"(?:project|projects?).*(?:yang|yg).*(?:ada|tersedia|dimiliki)",
+                r"(?:lihat|tampilkan|tunjukkan).*(?:project|projects?).*(?:saya|aku|kita)"
             ]
         },
         "create_project": {

@@ -27,38 +27,47 @@ def list_gcp_projects(env: str) -> dict:
     """
     print(f"--- Tool: list_gcp_projects called with env={env} ---")
     
+    if not env:
+        env = "all"
+    
     env_lower = env.lower()
+    projects_list = []
 
     try:
         # First approach: Try using Google Cloud Resource Manager API
         try:
-            # These imports are inside try-block as per original file structure
-            import google.auth 
-            from google.cloud import resourcemanager_v3
-            
-            if not HAS_GCP_TOOLS_FLAG:
-                raise ImportError("Google Cloud libraries not found, skipping API approach.")
-            
-            credentials, _ = google.auth.default()  # Can raise DefaultCredentialsError
+            print("Attempting to get default credentials...")
+            credentials, _ = google.auth.default()
+            if not credentials:
+                print("No default credentials found.")
+                raise google.auth.exceptions.DefaultCredentialsError("No default credentials found")
+                
+            print("Creating Resource Manager client...")
             client = resourcemanager_v3.ProjectsClient(credentials=credentials)
             
-            request = resourcemanager_v3.SearchProjectsRequest()  # Searches projects accessible to the user
-            projects_list = []
+            print("Sending SearchProjectsRequest...")
+            request = resourcemanager_v3.SearchProjectsRequest()
             
+            print("Fetching projects...")
             for project in client.search_projects(request=request):
                 project_id = project.project_id
                 project_name = project.display_name if project.display_name else project_id
+                state = project.state.name if hasattr(project.state, 'name') else 'UNKNOWN'
+                
+                # Format project entry with state
+                project_entry = f"{project_name} ({project_id}) - {state}"
                 
                 if env_lower == "all":
-                    projects_list.append(f"{project_name} ({project_id})")
+                    projects_list.append(project_entry)
                 elif (env_lower in project_id.lower() or \
                       (project_name and env_lower in project_name.lower())):
-                    projects_list.append(f"{project_name} ({project_id})")
+                    projects_list.append(project_entry)
             
             if projects_list:
+                report = f"Found {len(projects_list)} projects:\n" + "\n".join(projects_list)
                 return {
                     "status": "success",
-                    "report": "\n".join(projects_list)
+                    "report": report
                 }
             else:
                 print(f"No projects matching '{env}' found via API, trying gcloud CLI.")
@@ -67,113 +76,115 @@ def list_gcp_projects(env: str) -> dict:
         except (ImportError, google.auth.exceptions.DefaultCredentialsError) as cred_api_error:
             print(f"Google Cloud API setup failed: {cred_api_error}, trying gcloud CLI.")
             # Fall through to CLI
-        except Exception as api_error:  # Other API related errors
-            print(f"API approach failed: {api_error}, trying gcloud CLI.")
+        except Exception as api_error:
+            print(f"API approach failed: {str(api_error)}, trying gcloud CLI.")
             # Fall through to CLI
             
         # Second approach: Try using gcloud CLI
-        # This block is reached if the API approach fails or is skipped
         try:
-            import subprocess 
-            import json 
-            import os
-            
-            try:
-                subprocess.run(['gcloud', '--version'], capture_output=True, text=True, check=True, timeout=5)
-            except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as gcloud_check_error:
-                print(f"gcloud CLI not found or not working: {gcloud_check_error}, using mock data.")
-                raise Exception("gcloud CLI not available or timed out") 
+            print("Checking gcloud CLI availability...")
+            subprocess.run(['gcloud', '--version'], capture_output=True, text=True, check=True, timeout=5)
 
+            print("Listing projects via gcloud CLI...")
             result = subprocess.run(
                 ['gcloud', 'projects', 'list', '--format=json'],
                 capture_output=True,
                 text=True,
-                check=True, 
+                check=True,
                 env=os.environ.copy(),
-                timeout=30 
+                timeout=30
             )
             
             if result.stdout:
+                print("Parsing gcloud output...")
                 projects_data = json.loads(result.stdout)
-                filtered_projects = []
+                projects_list = []  # Reset list for CLI results
+                
+                print(f"Found {len(projects_data)} projects via gcloud")
                 for project in projects_data:
                     project_id = project.get('projectId', '')
-                    project_name = project.get('name', project_id) 
+                    project_name = project.get('name', project_id)
+                    state = project.get('lifecycleState', 'UNKNOWN')
+                    
+                    # Format project entry with state
+                    project_entry = f"{project_name} ({project_id}) - {state}"
                     
                     if env_lower == "all":
-                        filtered_projects.append(f"{project_name} ({project_id})")
+                        projects_list.append(project_entry)
                     elif (env_lower in project_id.lower() or \
                           (project_name and env_lower in project_name.lower())):
-                        filtered_projects.append(f"{project_name} ({project_id})")
+                        projects_list.append(project_entry)
                 
-                if filtered_projects:
+                if projects_list:
+                    report = f"Found {len(projects_list)} projects:\n" + "\n".join(projects_list)
                     return {
                         "status": "success",
-                        "report": "\n".join(filtered_projects)
+                        "report": report
                     }
                 else:
-                    print(f"No projects matching '{env}' found via gcloud CLI, using mock data.")
-                    raise Exception(f"No projects matching '{env}' found via gcloud CLI")
-            else: 
+                    print(f"No projects matching '{env}' found via gcloud, using mock data.")
+                    raise Exception(f"No projects matching '{env}' found via gcloud")
+
+            else:
                 print("gcloud command returned empty output, using mock data.")
                 raise Exception("gcloud command returned empty output")
 
-        except Exception as cli_error: 
-            print(f"CLI approach failed: {cli_error}, using mock data.")
-            pass 
+        except Exception as cli_error:
+            print(f"CLI approach failed: {str(cli_error)}, using mock data.")
+            # Fall through to mock data
             
-        # Fall back to mock data if both API and CLI approaches fail or are skipped
+        # Fall back to mock data if both approaches fail
+        print("Using mock data as fallback...")
         projects_mock = []
         if env_lower == "all":
             projects_mock = [
-                "project-mock-all-1 (mock-id-all-1)",
-                "project-mock-all-2 (mock-id-all-2)",
-                "another-dev-project-mock (mock-dev-3)",
-                "some-staging-project-mock (mock-stg-4)",
-                "critical-prod-app-mock (mock-prod-5)"
+                "Project All 1 (mock-id-all-1) - ACTIVE",
+                "Project All 2 (mock-id-all-2) - ACTIVE",
+                "Dev Project Mock (mock-dev-3) - ACTIVE",
+                "Staging Project Mock (mock-stg-4) - ACTIVE",
+                "Production Project Mock (mock-prod-5) - ACTIVE"
             ]
-            
-        elif env_lower == "dev" or env_lower == "development":
+        elif env_lower in ["dev", "development"]:
             projects_mock = [
-                "project-dev-1 (mock)", 
-                "project-dev-2 (mock)", 
-                "api-dev (mock)", 
-                "frontend-dev (mock)"
+                "Project Dev 1 (mock-dev-1) - ACTIVE", 
+                "Project Dev 2 (mock-dev-2) - ACTIVE", 
+                "API Dev (mock-dev-3) - ACTIVE", 
+                "Frontend Dev (mock-dev-4) - ACTIVE"
             ]
-        elif env_lower == "stg" or env_lower == "staging":
+        elif env_lower in ["stg", "staging"]:
             projects_mock = [
-                "project-stg-1 (mock)", 
-                "api-stg (mock)", 
-                "frontend-stg (mock)"
+                "Project Staging 1 (mock-stg-1) - ACTIVE", 
+                "API Staging (mock-stg-2) - ACTIVE", 
+                "Frontend Staging (mock-stg-3) - ACTIVE"
             ]
-        elif env_lower == "prod" or env_lower == "production":
+        elif env_lower in ["prod", "production"]:
             projects_mock = [
-                "project-prod-1 (mock)", 
-                "api-prod (mock)", 
-                "frontend-prod (mock)", 
-                "backend-prod (mock)"
+                "Project Production 1 (mock-prod-1) - ACTIVE", 
+                "API Production (mock-prod-2) - ACTIVE", 
+                "Frontend Production (mock-prod-3) - ACTIVE", 
+                "Backend Production (mock-prod-4) - ACTIVE"
             ]
         
         report_detail_prefix = "API and CLI approaches failed"
         if not HAS_GCP_TOOLS_FLAG:
             report_detail_prefix = "Google Cloud libraries not installed. API/CLI attempts skipped"
         
-        report_detail = f"{report_detail_prefix} for env='{env}'."
-
         if not projects_mock:
-            report_msg = f"Using mock data: {report_detail} No mock projects to list for this environment."
+            report_msg = f"Using mock data: {report_detail_prefix} for env='{env}'. No mock projects to list for this environment."
         else:
-            report_msg = f"Using mock data: {report_detail}\n" + "\n".join(projects_mock)
+            report_msg = f"Using mock data: {report_detail_prefix} for env='{env}'.\n" + "\n".join(projects_mock)
             
         return {
             "status": "success", 
             "report": report_msg
         }
                 
-    except Exception as e: 
+    except Exception as e:
+        error_msg = f"An unexpected error occurred in list_gcp_projects: {str(e)}"
+        print(f"ERROR: {error_msg}")
         return {
             "status": "error",
-            "error_message": f"An unexpected error occurred in list_gcp_projects: {e}"
+            "error_message": error_msg
         }
         
 def create_gcp_project(project_id: str, project_name: str = "", organization_id: str = "") -> dict:

@@ -76,21 +76,33 @@ class ProjectManager:
                 if not display_name or display_name.lower() == "none":
                     display_name = project_id
                 
-                # Add status indicator for non-active projects
+                # Add status indicator for non-active projects in Indonesian
                 status_text = ""
                 if state == "DELETE_REQUESTED":
-                    status_text = "(PENDING_DELETE - Will be permanently deleted in 30 days)"
+                    status_text = "(MENUNGGU PENGHAPUSAN - Akan dihapus permanen dalam 30 hari)"
                 elif state == "DELETE_IN_PROGRESS":
-                    status_text = "(DELETION IN PROGRESS)"
+                    status_text = "(SEDANG DIHAPUS)"
+                elif state == "INACTIVE":
+                    status_text = "(TIDAK AKTIF)"
                 elif state != "ACTIVE":
-                    status_text = f"({state})"
+                    status_text = f"(TIDAK DIKETAHUI - {state})"
                 
                 display_name = f"{display_name} {status_text}".strip()
-
+                
+                # Create GCPProject instance with status mapping
+                state_mapping = {
+                    "ACTIVE": "AKTIF",
+                    "DELETE_REQUESTED": "MENUNGGU PENGHAPUSAN",
+                    "DELETE_IN_PROGRESS": "SEDANG DIHAPUS",
+                    "INACTIVE": "TIDAK AKTIF"
+                }
+                
+                mapped_state = state_mapping.get(state, f"TIDAK DIKETAHUI ({state})")
+                
                 gcp_project = GCPProject(
                     id=project_details.project_id,
                     name=display_name,
-                    status=state,
+                    status=mapped_state,
                     resource_type="project",
                     project_id=project_details.project_id,
                     labels=dict(project_details.labels) if project_details.labels else {}

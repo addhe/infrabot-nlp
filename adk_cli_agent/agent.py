@@ -12,7 +12,7 @@ from google.adk.agents import Agent
 from .tools.time_tools import get_current_time
 from .tools.command_tools import execute_command
 # Import GCP tools and the flag indicating their availability
-from .tools.gcp_tools import list_gcp_projects, create_gcp_project, HAS_GCP_TOOLS_FLAG
+from .tools.gcp_tools_new import list_gcp_projects, create_gcp_project, delete_gcp_project, HAS_GCP_TOOLS_FLAG
 
 def cleanup():
     """Clean up resources before exit."""
@@ -47,22 +47,26 @@ tools = [get_current_time, execute_command]
 if HAS_GCP_TOOLS_FLAG:
     tools.append(list_gcp_projects)
     tools.append(create_gcp_project)
+    tools.append(delete_gcp_project)
 else:
-    print("GCP tools (list_gcp_projects, create_gcp_project) are NOT available due to missing dependencies (google-cloud-resource-manager or google-auth).")
+    print("GCP tools (list_gcp_projects, create_gcp_project, delete_gcp_project) are NOT available due to missing dependencies (google-cloud-resource-manager or google-auth).")
 
 # Create the agent - this is the main entry point for ADK
 root_agent = Agent(
     name="gemini_cli_agent",
     model=model_id,
-    description="A CLI agent that can help with time, execute commands, list and create GCP projects",
+    description="A CLI agent that can help with time, execute commands, and manage GCP projects",
     instruction="""You are a helpful CLI agent that can answer questions and execute commands.
-    You can provide the current time in various cities, execute shell commands.
-    If GCP tools are available, you can also list GCP projects (specify 'all' for all projects, or 'dev', 'stg', 'prod' to filter by environment),
-    and create new GCP projects when requested.
-
-    For creating GCP projects, you need a project ID (which must be globally unique) and optionally
-    a display name and organization ID. If no display name is provided, the project ID will be used as the name.
-    The organization ID (e.g., organizations/1234567890) is optional and specifies which Google Cloud organization the project should be created under.
+    You can provide the current time in various cities and execute shell commands.
+    
+    If GCP tools are available, you can:
+    1. List GCP projects (specify 'all' for all projects, or filter by 'dev', 'stg', 'prod')
+    2. Create new GCP projects (requires project ID and display name)
+    3. Delete GCP projects (with confirmation and safety checks)
+    
+    For creating GCP projects:
+    - Project ID must be globally unique and match the pattern: [a-z][a-z0-9-]* (starts with letter, only lowercase letters, numbers, and hyphens)
+    - Project name is recommended but optional. If not provided, the project ID will be used as the name
 
     Always be helpful, concise, and accurate in your responses.
     If a tool required for a request is not available (e.g. GCP tools), inform the user.
