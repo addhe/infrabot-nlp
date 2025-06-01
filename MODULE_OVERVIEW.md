@@ -32,7 +32,7 @@ Direktori ini berisi kode untuk agen interaksi API langsung.
 *   **`tools/`**: Implementasi kemampuan agen
     *   `base.py`: Kelas dan antarmuka alat dasar
     *   `command_tools.py`: Alat eksekusi perintah shell
-    *   `gcp_tools.py`: Alat integrasi Google Cloud Platform
+    *   `gcp_tools.py`: Alat integrasi Google Cloud Platform. Sekarang mendukung list project beserta status (misal: [ACTIVE], [DELETE_REQUESTED]) dan penghapusan project dengan error handling yang lebih baik.
     *   `terminal_tools.py`: Utilitas interaksi terminal
     *   `time_tools.py`: Fungsi terkait waktu
 
@@ -44,7 +44,7 @@ Direktori ini berisi kode untuk agen yang dibangun menggunakan Agent Development
 *   **`tools/`**: Mirip dengan implementasi API langsung, sub-direktori ini berisi modul alat, tetapi dirancang khusus dan terintegrasi untuk digunakan dengan ADK.
     *   `__init__.py`
     *   `command_tools.py`: Alat yang kompatibel dengan ADK untuk eksekusi perintah shell.
-    *   `gcp_tools.py`: Alat yang kompatibel dengan ADK untuk interaksi GCP.
+    *   `gcp_tools.py`: Alat yang kompatibel dengan ADK untuk interaksi GCP. Sekarang mendukung list project beserta status (misal: [ACTIVE], [DELETE_REQUESTED]) dan penghapusan project dengan error handling yang lebih baik.
     *   `time_tools.py`: Alat yang kompatibel dengan ADK untuk informasi terkait waktu.
 
 ### 3. Root Directory Files

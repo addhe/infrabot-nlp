@@ -11,6 +11,7 @@ Panduan ini memberikan petunjuk rinci tentang cara mengonfigurasi aplikasi Gemin
     *   [Kunci API Anthropic](#kunci-api-anthropic)
 3.  [Konfigurasi Google Cloud](#konfigurasi-google-cloud)
     *   [Kredensial Default Aplikasi (ADC)](#kredensial-default-aplikasi-adc)
+    *   [Status Project GCP](#status-project-gcp)
 4.  [Variabel Lingkungan](#variabel-lingkungan)
     *   [Mengatur Variabel Lingkungan](#mengatur-variabel-lingkungan)
         *   [Opsi A: Ekspor Langsung](#opsi-a-ekspor-langsung)
@@ -60,6 +61,10 @@ Aplikasi memerlukan kunci API untuk mengautentikasi dengan penyedia layanan AI.
     gcloud auth application-default login
     ```
     This command authenticates your local environment to access Google Cloud services.
+
+### Status Project GCP
+
+Ketika Anda menjalankan perintah list project GCP, status project (misal: [ACTIVE], [DELETE_REQUESTED]) akan ditampilkan di samping nama project. Jika Anda mencoba menghapus project yang tidak aktif, aplikasi akan memberikan pesan yang jelas.
 
 ## 4. Environment Variables
 

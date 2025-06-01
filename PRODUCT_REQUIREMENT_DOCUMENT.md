@@ -56,8 +56,9 @@ The application must support the following tools, callable via AI understanding 
 *   **FR2.2 Time Lookup:**
     *   **FR2.2.1**: Allow users to ask for the current time in specified cities or timezones.
 *   **FR2.3 GCP Project Management (requires user authentication with GCP):**
-    *   **FR2.3.1**: List GCP projects. Users shall be able to list all projects or filter them by environment (e.g., dev, stg, prod) if such tagging/naming conventions are used or if "all" is specified as the environment.
+    *   **FR2.3.1**: List GCP projects. Users shall be able to list all projects or filter them by environment (e.g., dev, stg, prod) if such tagging/naming conventions are used or if "all" is specified as the environment. The status of each project (e.g., [ACTIVE], [DELETE_REQUESTED]) must be shown in the listing.
     *   **FR2.3.2**: Create new GCP projects, allowing specification of project ID, name, and organization ID.
+    *   **FR2.3.3**: Delete GCP projects. If a project is not active or already scheduled for deletion, the user must receive a clear explanation.
 
 ### 4.3. Configuration
 

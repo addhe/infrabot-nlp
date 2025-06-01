@@ -138,8 +138,9 @@ Note: The current Dockerfile needs to be updated as it references a `gemini-bot.
 - Enhanced Gemini integration via Google's ADK in the ADK implementation
 - Execute shell commands directly from the CLI
 - Get current time in different cities
-- List GCP projects by environment (dev/stg/prod)
+- List GCP projects by environment (dev/stg/prod) and see their status (e.g., [ACTIVE], [DELETE_REQUESTED])
 - Create new GCP projects with custom IDs, names, and organization IDs
+- Delete GCP projects (with clear feedback if project is not active or already scheduled for deletion)
 - Modular code structure with separate modules for different tool categories
 - Simple and intuitive interface
 
@@ -152,6 +153,7 @@ Jika Anda menemukan kesalahan, periksa hal-hal berikut:
 * Periksa apakah skrip Python berjalan di lingkungan virtual
 * Verifikasi bahwa semua dependensi sudah terinstal dengan benar
 * Untuk operasi GCP, pastikan Anda memiliki izin yang diperlukan dan Google Cloud SDK sudah dikonfigurasi dengan benar
+* Jika Anda mencoba menghapus project GCP yang statusnya bukan [ACTIVE], Anda akan mendapat pesan bahwa project sudah tidak aktif atau sudah dijadwalkan untuk dihapus.
 * Jika Anda melihat peringatan tentang "Default value is not supported in function declaration schema for Google AI", ini adalah masalah yang dikenal dengan Google AI SDK dan tidak mempengaruhi fungsionalitas
 
 ## Struktur Proyek
