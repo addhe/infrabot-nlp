@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      target: development  # Gunakan development stage dari Dockerfile
+    container_name: infrabot-nlp
+    volumes:
+      - .:/app
+      - ~/.config/gcloud:/home/app_user/.config/gcloud:ro
+      - ~/.kube:/home/app_user/.kube:ro
+    environment:
+      - PYTHONPATH=/app
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+      - ENVIRONMENT=development
+    ports:
+      - "5000:5000"  # Port untuk API jika diperlukan
+    tty: true  # Mempertahankan container tetap berjalan
+    stdin_open: true  # Memungkinkan interaktif shell
+    restart: unless-stopped
+    working_dir: /app
+    # Use default values if UID/GID not provided
+    user: "${UID:-1000}:${GID:-1000}"  # Gunakan user ID yang sama dengan host
+    command: ["sleep", "infinity"]  # Tetap jalankan container
+
+  # Service untuk menjalankan agent
+  agent:
+    build:
+      context: .
+      target: development
+    container_name: infrabot-agent
+    volumes:
+      - .:/app
+      - ~/.config/gcloud:/home/app_user/.config/gcloud:ro
+      - ~/.kube:/home/app_user/.kube:ro
+    environment:
+      - PYTHONPATH=/app
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+      - ENVIRONMENT=development
+    depends_on:
+      - app
+    working_dir: /app
+    # Use default values if UID/GID not provided
+    user: "${UID:-1000}:${GID:-1000}"
+    command: ["poetry", "run", "python", "run_adk_agent.py"]
+
+  # Service untuk development tools (opsional)
+  dev-tools:
+    image: python:3.11-slim-bullseye  # Use more stable Python version
+    container_name: infrabot-dev-tools
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      - PYTHONPATH=/app
+    command: ["bash"]
+    tty: true
+    stdin_open: true
+    depends_on:
+      - app
+
+# Volumes untuk data persisten (jika diperlukan)
+volumes:
+  app-data:
+    driver: local

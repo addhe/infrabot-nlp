@@ -1,192 +1,303 @@
-# GCP Tools Architecture Design
+# GCP Tools Architecture with Agent Teams
 
 ## Overview
 
-This document outlines the modular architecture for Google Cloud Platform (GCP) tools in the infrabot-nlp project. The architecture is designed to be scalable, maintainable, and easily extensible for future GCP services.
+Dokumen ini menjelaskan arsitektur berbasis Agent Teams untuk Google Cloud Platform (GCP) tools dalam proyek infrabot-nlp. Arsitektur ini dirancang untuk:
+- Meningkatkan skalabilitas dan maintainability
+- Memisahkan tanggung jawab berdasarkan domain GCP
+- Memanfaatkan kekuatan Google ADK untuk orkestrasi agent
+- Menyediakan antarmuka yang konsisten untuk pengguna
 
 ## Current State vs. Target State
 
 ### Current State
-- Single monolithic `gcp_tools.py` file
-- Limited to project management operations
-- Mixed concerns and responsibilities
+- File `gcp_tools.py` tunggal yang monolitik
+- Operasi terbatas pada manajemen proyek
+- Pemisahan tanggung jawab yang kurang jelas
 
 ### Target State
-- Modular, service-based architecture
-- Comprehensive GCP service coverage
-- Clean separation of concerns
-- Standardized interfaces and error handling
+- Arsitektur berbasis Agent Teams
+- Setiap layanan GCP memiliki agent khusus
+- Delegasi tugas yang cerdas antar agent
+- Manajemen state dan session yang terpusat
+- Standarisasi error handling dan logging
 
 ## Architecture Principles
 
-### 1. Service-Based Modularity
-Each GCP service (Compute, Storage, Networking, etc.) has its own dedicated module.
+### 1. Agent-Based Specialization
+- Setiap agent fokus pada domain spesifik GCP
+- Agent root bertindak sebagai orchestrator
+- Delegasi otomatis berdasarkan keahlian agent
 
 ### 2. Standardized Operations
-All modules implement consistent CRUD operations:
-- **Create**: Create new resources
-- **Read**: List and describe resources
-- **Update**: Modify existing resources
-- **Delete**: Remove resources
+Setiap agent mengimplementasikan operasi standar:
+- **Create**: Membuat resource baru
+- **Read**: Melihat daftar dan detail resource
+- **Update**: Memodifikasi resource yang ada
+- **Delete**: Menghapus resource
 
-### 3. Layered Architecture
+### 3. Layered Architecture with Agent Teams
 ```
 ┌─────────────────────────────────────┐
-│         Tool Interface Layer        │  # User-facing tool functions
+│         Root Agent                 │  # Entry point, delegasi ke agent spesialis
 ├─────────────────────────────────────┤
-│       Service Management Layer      │  # Business logic and orchestration
+│       Specialized Agents           │  # Agent spesialis per domain GCP
+│  ┌─────────────┐ ┌─────────────┐   │
+│  │ Project     │ │ Compute     │   │
+│  │ Agent       │ │ Agent       │   │
+│  └─────────────┘ └─────────────┘   │
+│  ┌─────────────┐ ┌─────────────┐   │
+│  │ Storage     │ │ Network     │   │
+│  │ Agent       │ │ Agent       │   │
+│  └─────────────┘ └─────────────┘   │
 ├─────────────────────────────────────┤
-│         GCP Client Layer            │  # GCP API interactions
+│       GCP Client Layer             │  # Interaksi dengan GCP APIs
 ├─────────────────────────────────────┤
-│         Utilities Layer             │  # Common utilities and helpers
+│       Shared Utilities             │  # Utilitas dan helpers bersama
 └─────────────────────────────────────┘
 ```
 
-## Directory Structure
+## Agent-Based Directory Structure
 
 ```
-my_cli_agent/tools/gcp/
-├── __init__.py                    # Main GCP tools interface
-├── base/
-│   ├── __init__.py
-│   ├── client.py                  # Base GCP client management
-│   ├── exceptions.py              # Custom GCP exceptions
-│   ├── types.py                   # Common type definitions
-│   └── utils.py                   # Common utilities
-├── compute/
-│   ├── __init__.py
-│   ├── gce.py                     # Google Compute Engine
-│   ├── gke.py                     # Google Kubernetes Engine
-│   └── load_balancer.py           # Load balancers
-├── networking/
-│   ├── __init__.py
-│   ├── vpc.py                     # Virtual Private Cloud
-│   ├── subnet.py                  # Subnets
-│   ├── firewall.py                # Firewall rules
-│   └── dns.py                     # Cloud DNS
-├── storage/
-│   ├── __init__.py
-│   ├── cloud_storage.py           # Cloud Storage buckets
-│   ├── cloud_sql.py               # Cloud SQL databases
-│   └── persistent_disk.py         # Persistent disks
-├── data/
-│   ├── __init__.py
-│   ├── redis.py                   # Redis instances
-│   ├── memcache.py                # Memcached instances
-│   └── pubsub.py                  # Pub/Sub topics and subscriptions
-├── serverless/
-│   ├── __init__.py
-│   ├── cloud_run.py               # Cloud Run services
-│   └── cloud_functions.py         # Cloud Functions
-├── security/
-│   ├── __init__.py
-│   ├── iam.py                     # Identity and Access Management
-│   ├── secret_manager.py          # Secret Manager
-│   └── kms.py                     # Key Management Service
-├── management/
-│   ├── __init__.py
-│   ├── projects.py                # Project management
-│   ├── billing.py                 # Billing management
-│   └── monitoring.py              # Monitoring and logging
-└── tests/
+adk_cli_agent/
+├── __init__.py
+├── agent.py                      # Root agent dan inisialisasi
+└── tools/
     ├── __init__.py
-    ├── test_compute/
-    ├── test_networking/
-    ├── test_storage/
-    ├── test_data/
-    ├── test_serverless/
-    ├── test_security/
-    └── test_management/
+    ├── gcp/                      # GCP Agent Teams
+    │   ├── __init__.py           # Ekspor agent dan tools GCP
+    │   ├── base/
+    │   │   ├── __init__.py
+    │   │   ├── client.py         # Manajemen koneksi GCP
+    │   │   ├── exceptions.py     # Exception khusus GCP
+    │   │   └── types.py          # Tipe data umum
+    │   │
+    │   ├── agents/           # Agent spesialis
+    │   │   ├── __init__.py
+    │   │   ├── project_agent.py   # Manajemen proyek
+    │   │   ├── compute_agent.py   # GCE, GKE
+    │   │   ├── storage_agent.py   # Cloud Storage, Cloud SQL
+    │   │   ├── network_agent.py   # VPC, Firewall, DNS
+    │   │   ├── security_agent.py  # IAM, Secret Manager
+    │   │   └── pubsub_agent.py    # Pub/Sub
+    │   │
+    │   └── tools/            # Tools untuk agent
+    │       ├── __init__.py
+    │       ├── project_tools.py
+    │       ├── compute_tools.py
+    │       ├── storage_tools.py
+    │       ├── network_tools.py
+    │       └── security_tools.py
+    │
+    └── shared/                 # Utilitas bersama
+        ├── __init__.py
+        ├── auth.py              # Autentikasi dan otorisasi
+        ├── decorators.py        # Decorator umum
+        └── utils.py             # Fungsi utilitas
+
+tests/
+├── unit/
+│   └── adk_cli_agent/
+│       └── tools/
+│           └── gcp/
+│               └── test_agents/  # Test untuk setiap agent
+└── integration/
+    └── gcp/                # Test integrasi dengan GCP
 ```
 
-## Implementation Strategy
+## Implementation Strategy with Agent Teams
 
-### Phase 1: Core Infrastructure (Current Sprint)
-1. **Create base architecture**
-   - `base/` module with common utilities
-   - `management/projects.py` (migrate existing functionality)
-   - `networking/vpc.py` and `networking/subnet.py`
+### Phase 1: Core Agent Infrastructure (Sprint 1)
+1. **Setup Agent Base**
+   - Implementasi base agent dengan ADK
+   - Buat root agent untuk orkestrasi
+   - Implementasi project_agent dengan tools dasar
 
-2. **Establish patterns**
-   - Standardized error handling
-   - Consistent API interfaces
-   - Common testing patterns
+2. **Authentication & Error Handling**
+   - Sistem autentikasi terpusat
+   - Standarisasi error handling
+   - Logging dan monitoring dasar
 
-### Phase 2: Essential Services (Next Sprint)
-1. **Compute services**
-   - Google Compute Engine management
-   - Basic GKE cluster operations
+### Phase 2: Core Services Agents (Sprint 2)
+1. **Compute Agent**
+   - Manajemen GCE instances
+   - Operasi dasar GKE cluster
 
-2. **Storage services**
-   - Cloud Storage bucket management
-   - Cloud SQL instance management
+2. **Storage Agent**
+   - Manajemen Cloud Storage
+   - Operasi Cloud SQL
 
-### Phase 3: Advanced Services (Future)
-1. **Security and IAM**
-2. **Serverless platforms**
-3. **Data services**
-4. **Monitoring and operations**
+### Phase 3: Advanced Agents (Sprint 3)
+1. **Network Agent**
+   - Manajemen VPC, subnet, firewall
+   - Konfigurasi DNS dan load balancing
 
-## Interface Standards
+2. **Security Agent**
+   - Manajemen IAM
+   - Operasi Secret Manager
+   - Enkripsi dengan KMS
 
-### Standard Function Signature
+### Phase 4: Integration & Optimization (Sprint 4)
+1. **Agent Collaboration**
+   - Delegasi tugas antar agent
+   - Shared state management
+   - Optimasi performa
+
+2. **Advanced Features**
+   - Auto-scaling
+   - Cost optimization
+   - Security compliance checks
+
+## Agent and Tool Standards
+
+### Agent Definition
 ```python
-def operation_resource(
-    resource_id: str,
-    project_id: Optional[str] = None,
+# agents/base_agent.py
+from adk import Agent
+
+class BaseGCPAgent(Agent):
+    """Base class for all GCP agents"""
+    
+    def __init__(self, name: str, description: str):
+        super().__init__(
+            name=name,
+            description=description,
+            tools=self._register_tools()
+        )
+    
+    def _register_tools(self):
+        """Register tools for this agent"""
+        tools = []
+        for name, method in inspect.getmembers(self, inspect.ismethod):
+            if hasattr(method, '_is_tool'):
+                tools.append(method)
+        return tools
+
+# agents/project_agent.py
+class ProjectAgent(BaseGCPAgent):
+    """Agent khusus untuk manajemen proyek GCP"""
+    
+    def __init__(self):
+        super().__init__(
+            name="gcp-project-agent",
+            description="Manages GCP projects (create, list, update, delete)"
+        )
+    
+    @tool
+    async def create_project(self, project_id: str, name: str, **kwargs):
+        """Create a new GCP project"""
+        # Implementation here
+        pass
+```
+
+### Tool Definition
+```python
+# tools/project_tools.py
+from functools import wraps
+from typing import Dict, Any, Optional
+
+from ..base.exceptions import GCPToolsError
+
+def handle_gcp_errors(func):
+    """Decorator untuk menangani error GCP"""
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except GCPToolsError as e:
+            return {
+                "status": "error",
+                "message": str(e),
+                "code": getattr(e, 'code', 'UNKNOWN_ERROR')
+            }
+    return wrapper
+
+@handle_gcp_errors
+async def create_gcp_project(
+    project_id: str,
+    name: str,
+    organization_id: Optional[str] = None,
     **kwargs
-) -> ToolResult:
+) -> Dict[str, Any]:
     """
-    Perform operation on GCP resource.
+    Buat proyek GCP baru
     
     Args:
-        resource_id: The resource identifier
-        project_id: GCP project ID (optional, uses default if not provided)
-        **kwargs: Additional resource-specific parameters
+        project_id: ID unik untuk proyek
+        name: Nama tampilan proyek
+        organization_id: ID organisasi (opsional)
         
     Returns:
-        ToolResult with success status and resource information
+        Dict berisi status dan detail proyek
     """
+    # Implementation here
+    pass
 ```
 
-### Standard Response Format
+### Response Format
 ```python
+# base/types.py
+from dataclasses import dataclass, field
+from typing import Dict, Any, Optional, List
+
 @dataclass
 class GCPResource:
-    id: str
+    """Base class for all GCP resources"""
+    resource_type: str
+    resource_id: str
     name: str
     status: str
     region: Optional[str] = None
     zone: Optional[str] = None
-    created_time: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-# ToolResult.result should contain:
-{
-    "operation": "create|read|update|delete",
-    "resource_type": "vpc|subnet|instance|etc",
-    "resource": GCPResource,
-    "message": "Human-readable status message"
-}
+@dataclass
+class ToolResult:
+    """Standard response format for all tools"""
+    success: bool
+    message: str
+    data: Optional[Dict[str, Any]] = None
+    errors: Optional[List[Dict[str, Any]]] = None
+    
+    def to_dict(self):
+        return {
+            "success": self.success,
+            "message": self.message,
+            "data": self.data or {},
+            "errors": self.errors or []
+        }
 ```
 
-### Error Handling Standards
+### Error Handling
 ```python
+# base/exceptions.py
 class GCPToolsError(Exception):
-    """Base exception for GCP tools"""
-    pass
+    """Base exception untuk semua error GCP tools"""
+    code = "GCP_ERROR"
+    
+    def __init__(self, message: str, details: Any = None):
+        self.message = message
+        self.details = details
+        super().__init__(self.message)
 
 class GCPAuthenticationError(GCPToolsError):
-    """Authentication/authorization errors"""
-    pass
+    """Error autentikasi/otorisasi"""
+    code = "AUTHENTICATION_ERROR"
 
 class GCPResourceNotFoundError(GCPToolsError):
-    """Resource not found errors"""
-    pass
+    """Resource tidak ditemukan"""
+    code = "RESOURCE_NOT_FOUND"
 
 class GCPQuotaExceededError(GCPToolsError):
-    """Quota/limit exceeded errors"""
-    pass
+    """Kuota terlampaui"""
+    code = "QUOTA_EXCEEDED"
+
+class GCPValidationError(GCPToolsError):
+    """Validasi input gagal"""
+    code = "VALIDATION_ERROR"
 ```
 
 ## Testing Strategy
