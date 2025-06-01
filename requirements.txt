@@ -1,19 +1,9 @@
-# Google ADK dependencies
-google-adk>=0.1.0
-
-# Google Gemini dependencies (for backward compatibility)
-google-generativeai>=0.3.0
-# Optional: google-cloud-resource-manager>=1.0.0
+# Google ADK and GCP dependencies
+google-adk>=1.1.1
+google-cloud-resource-manager>=1.12.0
 google-auth>=2.22.0
-grpcio>=1.50.0
 
-# OpenAI dependencies
-openai>=1.12.0
-
-# Anthropic dependencies
-anthropic>=0.18.0
-
-# Time zone dependencies
+# Time zone dependencies  
 tzdata>=2023.3
 
 # Common dependencies

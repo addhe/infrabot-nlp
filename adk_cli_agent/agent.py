@@ -1,23 +1,70 @@
-"""ADK CLI Agent implementation.
+"""Simple CLI Agent implementation.
 
-This module implements a CLI agent using Google's Agent Development Kit (ADK).
+This module implements a CLI agent using our custom tools.
 It provides tools for getting current time, executing commands, and listing/creating GCP projects.
 """
 
 import os
 import atexit
-from google.adk.agents import Agent
 
 # Import tools from their respective modules
 from .tools.time_tools import get_current_time
 from .tools.command_tools import execute_command
 # Import GCP tools and the flag indicating their availability
-from .tools.gcp_tools_new import list_gcp_projects, create_gcp_project, delete_gcp_project, HAS_GCP_TOOLS_FLAG
+from .tools.gcp_tools import list_gcp_projects, create_gcp_project, HAS_GCP_TOOLS_FLAG
+
+class SimpleAgent:
+    """A simple CLI agent that uses function-based tools."""
+    
+    def __init__(self):
+        """Initialize the agent with available tools."""
+        self.tools = {
+            'get_current_time': get_current_time,
+            'execute_command': execute_command,
+        }
+        
+        # Add GCP tools if available
+        if HAS_GCP_TOOLS_FLAG:
+            self.tools.update({
+                'list_gcp_projects': list_gcp_projects,
+                'create_gcp_project': create_gcp_project,
+            })
+        
+        self.available_tools = list(self.tools.keys())
+        
+    def get_available_tools(self):
+        """Return list of available tools."""
+        return self.available_tools
+    
+    def execute_tool(self, tool_name, *args, **kwargs):
+        """Execute a tool by name with given arguments."""
+        if tool_name not in self.tools:
+            return {'status': 'error', 'message': f'Tool {tool_name} not available'}
+        
+        try:
+            result = self.tools[tool_name](*args, **kwargs)
+            return {'status': 'success', 'result': result}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+    
+    def help(self):
+        """Return help information about available tools."""
+        help_text = "Available tools:\n"
+        help_text += f"- get_current_time(city=None): Get current time, optionally for a specific city\n"
+        help_text += f"- execute_command(command): Execute a shell command\n"
+        
+        if HAS_GCP_TOOLS_FLAG:
+            help_text += f"- list_gcp_projects(env='all'): List GCP projects\n"
+            help_text += f"- create_gcp_project(project_id, project_name): Create a new GCP project\n"
+        else:
+            help_text += f"- GCP tools not available (missing dependencies)\n"
+            
+        return help_text
 
 def cleanup():
     """Clean up resources before exit."""
     try:
-        # Force cleanup of gRPC channels
+        # Force cleanup of gRPC channels if they exist
         import grpc
         if hasattr(grpc, '_channel') and hasattr(grpc._channel, '_channel_pool'):
             for channel in list(grpc._channel._channel_pool): # Iterate over a copy
@@ -29,47 +76,19 @@ def cleanup():
     except ImportError:
         pass # grpc might not be installed or available
     except Exception:
-        pass # Ignore other potential errors during cleanup
+        pass # Ignore all cleanup errors
 
 # Register cleanup on exit
 atexit.register(cleanup)
 
-# Get model ID from environment variable with fallback to a standard Gemini model
-# Use a model ID that is generally available and supports function calling
-model_id = os.getenv("GEMINI_MODEL_ID", "gemini-1.5-flash-latest")
+# Create the main agent instance
+agent = SimpleAgent()
 
+# For backward compatibility, also create a root_agent alias
+root_agent = agent
 
-# Create list of tools
-# Basic tools are always included
-tools = [get_current_time, execute_command]
-
-# Add GCP tools only if the necessary libraries are available (checked in gcp_tools.py)
+# Print initialization message
 if HAS_GCP_TOOLS_FLAG:
-    tools.append(list_gcp_projects)
-    tools.append(create_gcp_project)
-    tools.append(delete_gcp_project)
+    print(f"✅ Simple CLI Agent initialized with {len(agent.available_tools)} tools (including GCP tools)")
 else:
-    print("GCP tools (list_gcp_projects, create_gcp_project, delete_gcp_project) are NOT available due to missing dependencies (google-cloud-resource-manager or google-auth).")
-
-# Create the agent - this is the main entry point for ADK
-root_agent = Agent(
-    name="gemini_cli_agent",
-    model=model_id,
-    description="A CLI agent that can help with time, execute commands, and manage GCP projects",
-    instruction="""You are a helpful CLI agent that can answer questions and execute commands.
-    You can provide the current time in various cities and execute shell commands.
-    
-    If GCP tools are available, you can:
-    1. List GCP projects (specify 'all' for all projects, or filter by 'dev', 'stg', 'prod')
-    2. Create new GCP projects (requires project ID and display name)
-    3. Delete GCP projects (with confirmation and safety checks)
-    
-    For creating GCP projects:
-    - Project ID must be globally unique and match the pattern: [a-z][a-z0-9-]* (starts with letter, only lowercase letters, numbers, and hyphens)
-    - Project name is recommended but optional. If not provided, the project ID will be used as the name
-
-    Always be helpful, concise, and accurate in your responses.
-    If a tool required for a request is not available (e.g. GCP tools), inform the user.
-    """,
-    tools=tools
-)
+    print(f"✅ Simple CLI Agent initialized with {len(agent.available_tools)} tools (GCP tools unavailable)")
