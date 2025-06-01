@@ -48,12 +48,24 @@ def list_gcp_projects(env: str) -> dict:
             for project in client.search_projects(request=request):
                 project_id = project.project_id
                 project_name = project.display_name if project.display_name else project_id
-                
+                # Get project state if available (enum: ACTIVE, DELETE_REQUESTED, DELETE_IN_PROGRESS, etc)
+                project_state = getattr(project, "state", None)
+                if project_state is not None:
+                    # If enum, get name, else str
+                    try:
+                        state_str = project_state.name
+                    except Exception:
+                        state_str = str(project_state)
+                    state_display = f" [{state_str}]"
+                else:
+                    state_display = ""
+
+                line = f"{project_name} ({project_id}){state_display}"
                 if env_lower == "all":
-                    projects_list.append(f"{project_name} ({project_id})")
+                    projects_list.append(line)
                 elif (env_lower in project_id.lower() or \
                       (project_name and env_lower in project_name.lower())):
-                    projects_list.append(f"{project_name} ({project_id})")
+                    projects_list.append(line)
             
             if projects_list:
                 return {
@@ -98,13 +110,19 @@ def list_gcp_projects(env: str) -> dict:
                 filtered_projects = []
                 for project in projects_data:
                     project_id = project.get('projectId', '')
-                    project_name = project.get('name', project_id) 
-                    
+                    project_name = project.get('name', project_id)
+                    # Try to get project state from API or CLI output
+                    state = project.get('lifecycleState') or project.get('state')
+                    if state:
+                        state_display = f" [{state}]"
+                    else:
+                        state_display = ""
+                    line = f"{project_name} ({project_id}){state_display}"
                     if env_lower == "all":
-                        filtered_projects.append(f"{project_name} ({project_id})")
+                        filtered_projects.append(line)
                     elif (env_lower in project_id.lower() or \
                           (project_name and env_lower in project_name.lower())):
-                        filtered_projects.append(f"{project_name} ({project_id})")
+                        filtered_projects.append(line)
                 
                 if filtered_projects:
                     return {
@@ -270,4 +288,123 @@ def create_gcp_project(project_id: str, project_name: str = "", organization_id:
         return {
             "status": "error",
             "error_message": f"Failed to create GCP project '{project_id}': {e}"
+        }
+
+def delete_gcp_project(project_id: str) -> dict:
+    """Deletes a Google Cloud Platform (GCP) project.
+    
+    Args:
+        project_id (str): The ID of the project to delete
+        
+    Returns:
+        dict: Contains status and result or error message.
+    """
+    print(f"--- Tool: delete_gcp_project called with project_id={project_id} ---")
+    
+    # Input validation
+    if not project_id or not project_id.strip():
+        return {
+            "status": "error",
+            "error_message": "Project ID cannot be empty"
+        }
+    
+    project_id = project_id.strip()
+    
+    try:
+        # First approach: Try using Google Cloud Resource Manager API
+        try:
+            import google.auth
+            from google.cloud import resourcemanager_v3
+            
+            if not HAS_GCP_TOOLS_FLAG:
+                raise ImportError("Google Cloud libraries not found, skipping API approach.")
+
+            credentials, _ = google.auth.default()
+            client = resourcemanager_v3.ProjectsClient(credentials=credentials)
+            
+            # Check if project exists first
+            try:
+                project_name = f"projects/{project_id}"
+                project = client.get_project(name=project_name)
+                project_display_name = project.display_name if project.display_name else project_id
+            except Exception as get_error:
+                return {
+                    "status": "error",
+                    "error_message": f"Project '{project_id}' not found or not accessible: {get_error}"
+                }
+            
+            # Delete the project
+            request = resourcemanager_v3.DeleteProjectRequest(name=project_name)
+            operation = client.delete_project(request=request)
+            
+            print(f"Deleting project {project_id} via API... This may take a few minutes.")
+            operation.result(timeout=120)  # Wait for the operation to complete
+            
+            return {
+                "status": "success",
+                "report": f"Project '{project_display_name}' ({project_id}) deleted successfully via API."
+            }
+                
+        except (ImportError, google.auth.exceptions.DefaultCredentialsError) as cred_api_error:
+            print(f"Google Cloud API setup failed for delete_project: {cred_api_error}, trying gcloud CLI.")
+        except Exception as api_error:
+            print(f"API approach for delete_project failed: {api_error}, trying gcloud CLI.")
+            
+        # Second approach: Try using gcloud CLI
+        import subprocess
+        import os
+            
+        try:
+            subprocess.run(['gcloud', '--version'], capture_output=True, text=True, check=True, timeout=5)
+        except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as gcloud_check_error:
+            print(f"gcloud CLI not found or not working for delete_project: {gcloud_check_error}")
+            raise Exception(f"gcloud CLI not available or timed out: {gcloud_check_error}")
+
+        cmd = ['gcloud', 'projects', 'delete', project_id, '--quiet', '--format=json']
+        print(f"Deleting project {project_id} via gcloud CLI... This may take a few minutes.")
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True,  # Will raise error if gcloud command fails
+                env=os.environ.copy(),
+                timeout=180  # Longer timeout for project deletion
+            )
+            return {
+                "status": "success",
+                "report": f"Project '{project_id}' deleted successfully via gcloud CLI."
+            }
+        except subprocess.CalledProcessError as cli_error:
+            # Check for 'Project not active' in CLI error output
+            error_output = cli_error.stderr or cli_error.output or str(cli_error)
+            if "Project not active" in error_output or "project not active" in error_output:
+                return {
+                    "status": "error",
+                    "error_message": (
+                        f"Project '{project_id}' is not active and cannot be deleted. "
+                        "This usually means the project is already scheduled for deletion or is in a non-active state. "
+                        "You do not need to delete it again. Please check the GCP Console for its current status."
+                    )
+                }
+            return {
+                "status": "error",
+                "error_message": f"Failed to delete GCP project '{project_id}' via gcloud CLI: {error_output}"
+            }
+                
+    except Exception as e:
+        # Improve error message for 'Project not active' case
+        error_str = str(e)
+        if "Project not active" in error_str or "project not active" in error_str:
+            return {
+                "status": "error",
+                "error_message": (
+                    f"Project '{project_id}' is not active and cannot be deleted. "
+                    "It may already be scheduled for deletion or is in a non-active state. "
+                    "Please check the GCP Console for the current status."
+                )
+            }
+        return {
+            "status": "error",
+            "error_message": f"Failed to delete GCP project '{project_id}': {e}"
         }
