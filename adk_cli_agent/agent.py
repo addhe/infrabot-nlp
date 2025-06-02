@@ -12,7 +12,7 @@ from google.adk.agents import Agent
 from .tools.time_tools import get_current_time
 from .tools.command_tools import execute_command
 # Import GCP tools and the flag indicating their availability
-from .tools.gcp_tools import list_gcp_projects, create_gcp_project, delete_gcp_project, HAS_GCP_TOOLS_FLAG
+from .tools.gcp_tools import list_gcp_projects, create_gcp_project, delete_gcp_project
 
 def cleanup():
     """Clean up resources before exit."""
@@ -36,7 +36,7 @@ atexit.register(cleanup)
 
 # Get model ID from environment variable with fallback to a standard Gemini model
 # Use a model ID that is generally available and supports function calling
-model_id = os.getenv("GEMINI_MODEL_ID", "gemini-1.5-flash-latest")
+model_id = os.getenv("GEMINI_MODEL_ID", "gemini-1.5-flash-8b")
 
 
 # Create list of tools
@@ -44,6 +44,11 @@ model_id = os.getenv("GEMINI_MODEL_ID", "gemini-1.5-flash-latest")
 tools = [get_current_time, execute_command]
 
 # Add GCP tools only if the necessary libraries are available (checked in gcp_tools.py)
+try:
+    from .tools.gcp_project import HAS_GCP_TOOLS_FLAG
+except ImportError:
+    HAS_GCP_TOOLS_FLAG = False
+
 if HAS_GCP_TOOLS_FLAG:
     tools.append(list_gcp_projects)
     tools.append(create_gcp_project)

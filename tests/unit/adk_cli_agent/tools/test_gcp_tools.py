@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from adk_cli_agent.tools.gcp_tools import (
     list_gcp_projects,
     create_gcp_project,
-    HAS_GCP_TOOLS_FLAG
+
 )
 
 # Test data
@@ -98,19 +98,21 @@ class TestGCPTools:
         assert result["status"] == "success"
         assert "test-project-1" in result["report"]
 
-    async def test_create_project_no_deps(self, mock_projects_client, mock_google_auth):
+    async def test_create_project_no_deps(self):
         """Test project creation when dependencies are not available."""
-        with patch("adk_cli_agent.tools.gcp_tools.HAS_GCP_TOOLS_FLAG", False):
-            with patch("subprocess.run", side_effect=Exception("gcloud not found")):
-                result = create_gcp_project(
-                    project_id="test-project",
-                    project_name="Test Project"
-                )
-                assert isinstance(result, dict)
-                assert result["status"] == "error"
-                # Check for either error message since behavior might vary
-                assert any(msg in result["error_message"].lower() 
-                         for msg in ["not installed", "gcloud not found", "failed to create gcp project"])
+        # Patch both API and CLI dependencies to simulate both unavailable
+        with patch("google.auth.default", side_effect=ImportError("No google.auth")):
+            with patch("google.cloud.resourcemanager_v3.ProjectsClient", side_effect=ImportError("No ProjectsClient")):
+                with patch("subprocess.run", side_effect=Exception("gcloud not found")):
+                    result = create_gcp_project(
+                        project_id="test-project",
+                        project_name="Test Project"
+                    )
+                    assert isinstance(result, dict)
+                    assert result["status"] == "error"
+                    # Check for either error message since behavior might vary
+                    assert any(msg in result["error_message"].lower() 
+                               for msg in ["not installed", "gcloud not found", "failed to create gcp project", "neither google cloud api nor gcloud cli is available"])
 
     async def test_create_project_no_creds(self, mock_projects_client):
         """Test project creation when credentials are not available."""
