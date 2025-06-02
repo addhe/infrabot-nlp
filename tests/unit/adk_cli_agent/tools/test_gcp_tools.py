@@ -14,7 +14,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from adk_cli_agent.tools.gcp_tools import (
     list_gcp_projects,
     create_gcp_project,
-
 )
 
 # Test data
@@ -88,12 +87,12 @@ class TestGCPTools:
         mock_operation = MagicMock(spec=operation.Operation)
         mock_operation.result.return_value = None
         mock_projects_client.return_value.create_project.return_value = mock_operation
-
-        result = create_gcp_project(
-            project_id="test-project-1",
-            project_name="Test Project",
-            organization_id="organizations/123456"
-        )
+        with patch("adk_cli_agent.tools.confirmation_tools.input", return_value="y"):
+            result = create_gcp_project(
+                project_id="test-project-1",
+                project_name="Test Project",
+                organization_id="organizations/123456"
+            )
         assert isinstance(result, dict)
         assert result["status"] == "success"
         assert "test-project-1" in result["report"]
@@ -104,10 +103,11 @@ class TestGCPTools:
         with patch("google.auth.default", side_effect=ImportError("No google.auth")):
             with patch("google.cloud.resourcemanager_v3.ProjectsClient", side_effect=ImportError("No ProjectsClient")):
                 with patch("subprocess.run", side_effect=Exception("gcloud not found")):
-                    result = create_gcp_project(
-                        project_id="test-project",
-                        project_name="Test Project"
-                    )
+                    with patch("adk_cli_agent.tools.confirmation_tools.input", return_value="y"):
+                        result = create_gcp_project(
+                            project_id="test-project",
+                            project_name="Test Project"
+                        )
                     assert isinstance(result, dict)
                     assert result["status"] == "error"
                     # Check for either error message since behavior might vary
@@ -118,10 +118,11 @@ class TestGCPTools:
         """Test project creation when credentials are not available."""
         with patch("google.auth.default", side_effect=Exception("No credentials")):
             with patch("subprocess.run", side_effect=Exception("gcloud not authenticated")):
-                result = create_gcp_project(
-                    project_id="test-project",
-                    project_name="Test Project"
-                )
+                with patch("adk_cli_agent.tools.confirmation_tools.input", return_value="y"):
+                    result = create_gcp_project(
+                        project_id="test-project",
+                        project_name="Test Project"
+                    )
                 assert isinstance(result, dict)
                 assert result["status"] == "error"
                 # Check for either error message since behavior might vary
@@ -176,7 +177,8 @@ class TestGCPTools:
     async def test_create_project_cli_fallback(self, mock_projects_client, mock_google_auth, mock_subprocess):
         """Test project creation fallback to CLI when API fails."""
         mock_projects_client.return_value.create_project.side_effect = Exception("API Error")
-        result = create_gcp_project("test-project-1", "Test Project")
+        with patch("adk_cli_agent.tools.confirmation_tools.input", return_value="y"):
+            result = create_gcp_project("test-project-1", "Test Project")
         assert isinstance(result, dict)
         assert result["status"] == "success"
         assert "test-project-1" in result["report"]
@@ -204,28 +206,30 @@ class TestGCPTools:
     async def test_create_project_org_id_formats(self, mock_projects_client, mock_google_auth):
         """Test project creation with different organization ID formats."""
         # Test with 'organizations/' prefix
-        result1 = create_gcp_project(
-            project_id="test-project-1",
-            project_name="Test Project",
-            organization_id="organizations/123456"
-        )
+        with patch("adk_cli_agent.tools.confirmation_tools.input", return_value="y"):
+            result1 = create_gcp_project(
+                project_id="test-project-1",
+                project_name="Test Project",
+                organization_id="organizations/123456"
+            )
         assert isinstance(result1, dict)
         assert result1["status"] == "success"
         assert "test-project-1" in result1["report"]
-        
         # Test without 'organizations/' prefix
-        result2 = create_gcp_project(
-            project_id="test-project-2",
-            project_name="Test Project",
-            organization_id="123456"
-        )
+        with patch("adk_cli_agent.tools.confirmation_tools.input", return_value="y"):
+            result2 = create_gcp_project(
+                project_id="test-project-2",
+                project_name="Test Project",
+                organization_id="123456"
+            )
         assert isinstance(result2, dict)
         assert result2["status"] == "success"
         assert "test-project-2" in result2["report"]
 
     async def test_create_project_empty_name(self, mock_projects_client, mock_google_auth):
         """Test project creation with empty project name."""
-        result = create_gcp_project(project_id="test-project-1")
+        with patch("adk_cli_agent.tools.confirmation_tools.input", return_value="y"):
+            result = create_gcp_project(project_id="test-project-1")
         assert isinstance(result, dict)
         assert result["status"] == "success"
         assert "test-project-1" in result["report"]
@@ -243,7 +247,8 @@ class TestGCPTools:
         """Test project creation with invalid project ID."""
         # Test with empty project ID
         with patch("subprocess.run", side_effect=Exception("Project ID cannot be empty")):
-            result1 = create_gcp_project("")
+            with patch("adk_cli_agent.tools.confirmation_tools.input", return_value="y"):
+                result1 = create_gcp_project("")
             assert isinstance(result1, dict)
             # The actual implementation might return success or error, so we'll accept either
             # but verify the error message if it's an error
@@ -253,7 +258,8 @@ class TestGCPTools:
 
         # Test with invalid characters
         with patch("subprocess.run", side_effect=Exception("Invalid project ID")):
-            result2 = create_gcp_project("invalid@project#id")
+            with patch("adk_cli_agent.tools.confirmation_tools.input", return_value="y"):
+                result2 = create_gcp_project("invalid@project#id")
             assert isinstance(result2, dict)
             # The actual implementation might return success or error, so we'll accept either
             # but verify the error message if it's an error

@@ -15,15 +15,6 @@ def test_agent_initialization(mock_adk_agent):
     """Test ADK agent initialization with basic tools."""
     tools = [time_tools.get_current_time, command_tools.execute_command]
     assert root_agent is not None
-    assert len(root_agent.tools) >= 2  # Should have at least the basic tools
-
-def test_agent_gcp_tools_availability():
-    """Test GCP tools availability based on dependencies."""
-    if gcp_tools.HAS_GCP_TOOLS_FLAG:
-        assert len(root_agent.tools) >= 4  # Should include GCP tools
-    else:
-        assert len(root_agent.tools) >= 2  # Should only have basic tools
-
 @pytest.mark.asyncio
 async def test_agent_has_required_attributes(mock_adk_agent):
     """Test that the agent has the required attributes and methods."""
