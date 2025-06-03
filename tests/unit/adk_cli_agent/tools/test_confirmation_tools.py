@@ -1,4 +1,8 @@
 """Unit tests for confirmation_tools module."""
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../../')))
+
 import pytest
 from adk_cli_agent.tools.confirmation_tools import confirm_action
 from unittest.mock import patch

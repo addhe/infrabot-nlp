@@ -13,7 +13,9 @@ from adk_cli_agent.tools.gcp_vpc import (
     create_vpc_network,
     create_subnet,
     list_vpc_networks,
-    get_vpc_details
+    get_vpc_details,
+    HAS_GCP_TOOLS_FLAG,
+    compute_v1
 )
 
 # Test data
@@ -361,3 +363,84 @@ class TestGetVpcDetails:
         # Check the result
         assert result["status"] == "success"
         assert "network" in result
+
+def test_list_vpc_networks_handles_str_type(monkeypatch):
+    class DummyNetworksClient:
+        def list(self, project):
+            return ["not-a-dict-or-object"]
+    class DummySubnetworksClient:
+        def aggregated_list(self, request):
+            return []
+    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", True)
+    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.get_gcp_credentials", lambda: None)
+    monkeypatch.setattr(compute_v1, "NetworksClient", lambda credentials=None: DummyNetworksClient())
+    monkeypatch.setattr(compute_v1, "SubnetworksClient", lambda credentials=None: DummySubnetworksClient())
+    result = list_vpc_networks("dummy-project")
+    assert result["status"] == "success"
+    assert isinstance(result["networks"], list)
+
+def test_list_vpc_networks_enable_api_on_error(monkeypatch):
+    class DummyNetworksClient:
+        calls = 0  # Use a class variable to persist across instances
+        def __init__(self):
+            pass
+        def list(self, project):
+            if DummyNetworksClient.calls == 0:
+                DummyNetworksClient.calls += 1
+                raise Exception("API not enabled")
+            return []
+    class DummySubnetworksClient:
+        def aggregated_list(self, request):
+            return []
+    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", True)
+    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.get_gcp_credentials", lambda: None)
+    monkeypatch.setattr(compute_v1, "NetworksClient", lambda credentials=None: DummyNetworksClient())
+    monkeypatch.setattr(compute_v1, "SubnetworksClient", lambda credentials=None: DummySubnetworksClient())
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(stdout="enabled", returncode=0)
+        result = list_vpc_networks("dummy-project")
+        assert result["status"] == "success"
+
+def test_get_vpc_details_handles_unexpected_types(monkeypatch):
+    class DummyNetwork:
+        name = "test"
+        id = "id"
+        auto_create_subnetworks = True
+        routing_config = None
+        peerings = ["not-a-dict-or-object"]
+        creation_timestamp = "2025-06-03T00:00:00Z"
+        description = "desc"
+    class DummySubnetList:
+        subnetworks = ["not-a-dict-or-object"]
+    class DummyNetworksClient:
+        def get(self, project, network):
+            return DummyNetwork()
+    class DummySubnetworksClient:
+        def aggregated_list(self, request):
+            return [("regions/us-central1", DummySubnetList())]
+    class DummyFirewallsClient:
+        def list(self, project, filter):
+            return ["not-a-dict-or-object"]
+    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", True)
+    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.get_gcp_credentials", lambda: None)
+    monkeypatch.setattr(compute_v1, "NetworksClient", lambda credentials=None: DummyNetworksClient())
+    monkeypatch.setattr(compute_v1, "SubnetworksClient", lambda credentials=None: DummySubnetworksClient())
+    monkeypatch.setattr(compute_v1, "FirewallsClient", lambda credentials=None: DummyFirewallsClient())
+    result = get_vpc_details("dummy-project", "test")
+    assert result["status"] == "success"
+    assert isinstance(result["network"], dict)
+
+def test_list_vpc_networks_cli_fallback(monkeypatch):
+    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", False)
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(stdout='[{"name": "default", "id": "123"}]', returncode=0)
+        with patch("json.loads", wraps=json.loads) as mock_json:
+            result = list_vpc_networks("dummy-project")
+            assert result["status"] == "success"
+            assert "networks" in result
+
+def test_list_vpc_networks_error(monkeypatch):
+    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", False)
+    with patch("subprocess.run", side_effect=Exception("CLI error")):
+        result = list_vpc_networks("dummy-project")
+        assert result["status"] == "error"

@@ -1,5 +1,8 @@
-"""Tests for command_tools module."""
+import sys
 import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../../')))
+
+"""Tests for command_tools module."""
 import subprocess
 from unittest.mock import patch, MagicMock
 import pytest
