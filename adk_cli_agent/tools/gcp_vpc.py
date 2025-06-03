@@ -51,13 +51,19 @@ try:
                 self.credentials = credentials
 
             def insert(self, **kwargs):
+                network_resource = kwargs.get("network_resource")
                 class MockOperation:
+                    def __init__(self, network_resource):
+                        self.network_resource = network_resource
                     def result(self):
                         result = MockNetwork()
                         result.id = "mock-network-id"
-                        result.name = kwargs.get("network_resource", MockNetwork()).name
+                        if self.network_resource and hasattr(self.network_resource, 'name'):
+                            result.name = self.network_resource.name
+                        else:
+                            result.name = "mock-network"
                         return result
-                return MockOperation()
+                return MockOperation(network_resource)
 
             def list(self, **kwargs):
                 result = []
@@ -82,7 +88,11 @@ try:
                     def result(self):
                         result = MockSubnetwork()
                         result.id = "mock-subnet-id"
-                        result.name = kwargs.get("subnetwork_resource", MockSubnetwork()).name
+                        subnetwork_resource = kwargs.get("subnetwork_resource")
+                        if subnetwork_resource and hasattr(subnetwork_resource, 'name'):
+                            result.name = subnetwork_resource.name
+                        else:
+                            result.name = "mock-subnet"
                         return result
                 return MockOperation()
 
@@ -150,60 +160,71 @@ def create_vpc_network(
     try:
         # First approach: Try using Google Cloud Compute API
         if HAS_GCP_TOOLS_FLAG:
-            print("Using Google Cloud Compute API approach (test mode)")
-            credentials = get_gcp_credentials()
-            network_client = compute_v1.NetworksClient(credentials=credentials)
+            try:
+                print("Using Google Cloud Compute API approach")
+                credentials = get_gcp_credentials()
+                network_client = compute_v1.NetworksClient(credentials=credentials)
+                network = compute_v1.Network()
+                network.name = network_name
+                network.description = description
+                network.auto_create_subnetworks = (subnet_mode.lower() == "auto")
 
-            # Fallback to gcloud CLI for reliability
-            print("Using gcloud CLI for network creation")
-            subnet_arg = f"--subnet-mode={'auto' if subnet_mode.lower() == 'auto' else 'custom'}"
-            routing_arg = f"--bgp-routing-mode={routing_mode.lower()}"
-            cmd = [
-                "gcloud", "compute", "networks", "create", network_name,
-                f"--project={project_id}", subnet_arg, routing_arg
-            ]
-            if description:
-                cmd.extend(["--description", description])
+                # Set routing config
+                routing_config = compute_v1.NetworkRoutingConfig()
+                if routing_mode.lower() == "global":
+                    routing_config.routing_mode = compute_v1.NetworkRoutingConfig.RoutingMode.GLOBAL
+                else:
+                    routing_config.routing_mode = compute_v1.NetworkRoutingConfig.RoutingMode.REGIONAL
+                network.routing_config = routing_config
 
-            print(f"Running command: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                # Create network using the API
+                operation = network_client.insert(
+                    project=project_id,
+                    network_resource=network
+                )
 
-            # Parse the result from gcloud command
-            return {
-                "status": "success",
-                "message": f"VPC network '{network_name}' created successfully in project '{project_id}'",
-                "network": {
-                    "name": network_name,
-                    "id": network_name,  # ID is typically the name in GCP
-                    "subnet_mode": subnet_mode,
-                    "routing_mode": routing_mode
+                # Wait for operation to complete
+                result = operation.result()
+                return {
+                    "status": "success",
+                    "message": f"VPC network '{network_name}' created successfully in project '{project_id}'",
+                    "network": {
+                        "name": network_name,
+                        "id": result.id,
+                        "subnet_mode": subnet_mode,
+                        "routing_mode": routing_mode
+                    }
                 }
-            }
-        else:
-            # Fallback to gcloud CLI for production use
-            print("Using gcloud CLI approach")
-            subnet_arg = "--subnet-mode=auto" if subnet_mode.lower() == "auto" else "--subnet-mode=custom"
-            routing_arg = f"--bgp-routing-mode={routing_mode.lower()}"
-            cmd = [
-                "gcloud", "compute", "networks", "create", network_name,
-                f"--project={project_id}", subnet_arg, routing_arg,
-                "--format=json"  # Request JSON output for more consistent parsing
-            ]
-            if description:
-                cmd.extend(["--description", description])
-            print(f"Running command: {' '.join(cmd)}")
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            print(f"Command completed successfully")
-            return {
-                "status": "success",
-                "message": f"VPC network '{network_name}' created successfully in project '{project_id}'",
-                "details": result.stdout
-            }
+            except Exception as api_error:
+                print(f"API approach failed: {api_error}, falling back to CLI")
+                # Fall through to CLI approach
+
+        # Fallback to gcloud CLI approach
+        print("Using gcloud CLI for network creation")
+        subnet_arg = f"--subnet-mode={'auto' if subnet_mode.lower() == 'auto' else 'custom'}"
+        routing_arg = f"--bgp-routing-mode={routing_mode.lower()}"
+        cmd = [
+            "gcloud", "compute", "networks", "create", network_name,
+            f"--project={project_id}", subnet_arg, routing_arg
+        ]
+        if description:
+            cmd.extend(["--description", description])
+
+        print(f"Running command: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        # Parse the result from gcloud command
+        return {
+            "status": "success",
+            "message": f"VPC network '{network_name}' created successfully in project '{project_id}'",
+            "network": {
+                "name": network_name,
+                "id": network_name,  # ID is typically the name in GCP
+                "subnet_mode": subnet_mode,
+                "routing_mode": routing_mode
+            },
+            "details": result.stdout
+        }
     except subprocess.CalledProcessError as e:
         error_details = e.stderr if hasattr(e, "stderr") else str(e)
         print(f"CLI Error: {error_details}")

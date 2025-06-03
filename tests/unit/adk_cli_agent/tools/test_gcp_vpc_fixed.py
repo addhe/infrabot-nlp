@@ -183,8 +183,17 @@ def mock_subprocess():
 class TestCreateVpcNetwork:
     """Tests for create_vpc_network function."""
     
+    @patch("adk_cli_agent.tools.gcp_vpc.compute_v1.Network", autospec=True)
+    @patch("adk_cli_agent.tools.gcp_vpc.compute_v1.NetworkRoutingConfig", autospec=True)
     @patch("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", True)
-    def test_create_vpc_network_api_success(self, mock_get_gcp_credentials, mock_compute_networks_client, mock_confirmation):
+    def test_create_vpc_network_api_success(
+        self,
+        mock_network,           # for Network
+        mock_routing_config,    # for NetworkRoutingConfig
+        mock_get_gcp_credentials,
+        mock_compute_networks_client,
+        mock_confirmation
+    ):
         """Test creating a VPC network using the API successfully."""
         result = create_vpc_network(
             project_id="test-project", 
