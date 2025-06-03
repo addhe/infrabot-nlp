@@ -14,6 +14,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from adk_cli_agent.tools.gcp_tools import (
     list_gcp_projects,
     create_gcp_project,
+    create_vpc_network,
+    create_subnet,
+    list_vpc_networks,
+    get_vpc_details
 )
 
 # Test data

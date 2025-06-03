@@ -59,6 +59,11 @@ The application must support the following tools, callable via AI understanding 
     *   **FR2.3.1**: List GCP projects. Users shall be able to list all projects or filter them by environment (e.g., dev, stg, prod) if such tagging/naming conventions are used or if "all" is specified as the environment. The status of each project (e.g., [ACTIVE], [DELETE_REQUESTED]) must be shown in the listing.
     *   **FR2.3.2**: Create new GCP projects, allowing specification of project ID, name, and organization ID.
     *   **FR2.3.3**: Delete GCP projects. If a project is not active or already scheduled for deletion, the user must receive a clear explanation.
+    *   **FR2.3.4**: VPC Management:
+        *   **FR2.3.4.1**: Create new VPC networks in GCP projects, allowing specification of network name, subnet mode (auto or custom), and routing mode (global or regional).
+        *   **FR2.3.4.2**: Create custom subnets within VPCs, specifying region, CIDR range, and private Google access settings.
+        *   **FR2.3.4.3**: List existing VPC networks and their subnets in a specified project.
+        *   **FR2.3.4.4**: Display detailed information about a specific VPC network, including its subnets, firewall rules, and peering connections.
 
 ### 4.3. Configuration
 
@@ -110,3 +115,9 @@ The application must support the following tools, callable via AI understanding 
 *   **FC8. Output Formatting**: Allow users to specify output formats for tool results (e.g., JSON, YAML, table).
 *   **FC9. Logging and Auditing**: Enhanced logging for debugging and auditing user commands and AI interactions.
 *   **FC10. Testing Framework**: Comprehensive unit and integration tests.
+*   **FC11. Enhanced VPC Management**: Advanced VPC features including:
+    *   Firewall rule management for VPC networks
+    *   VPC Network Peering configuration
+    *   Cloud NAT setup for private instances
+    *   Shared VPC configuration across projects
+    *   VPC Service Controls integration for security boundaries

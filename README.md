@@ -138,9 +138,15 @@ Note: The current Dockerfile needs to be updated as it references a `gemini-bot.
 - Enhanced Gemini integration via Google's ADK in the ADK implementation
 - Execute shell commands directly from the CLI
 - Get current time in different cities
-- List GCP projects by environment (dev/stg/prod) and see their status (e.g., [ACTIVE], [DELETE_REQUESTED])
-- Create new GCP projects with custom IDs, names, and organization IDs
-- Delete GCP projects (with clear feedback if project is not active or already scheduled for deletion)
+- GCP infrastructure management:
+  - List GCP projects by environment (dev/stg/prod) and see their status (e.g., [ACTIVE], [DELETE_REQUESTED])
+  - Create new GCP projects with custom IDs, names, and organization IDs
+  - Delete GCP projects (with clear feedback if project is not active or already scheduled for deletion)
+  - Create VPC networks with custom or auto subnet mode and global/regional routing
+  - Create custom subnets with specified CIDR ranges and private Google access settings
+  - List VPC networks and their subnets in a project
+  - View detailed information about VPC networks including firewall rules and peerings
+  - View detailed information about VPC networks including firewall rules and peerings
 - Modular code structure with separate modules for different tool categories
 - Simple and intuitive interface
 
@@ -161,15 +167,16 @@ Jika Anda menemukan kesalahan, periksa hal-hal berikut:
 Proyek ini diorganisir dalam struktur modular:
 
 ```
-├── adk_cli_agent/            # Implementasi ADK
-│   ├── agent.py              # Implementasi agen utama menggunakan ADK
-│   ├── tools/                # Modul alat untuk implementasi ADK
 ├── adk_cli_agent/            # ADK implementation
 │   ├── agent.py              # Main agent implementation using ADK
 │   ├── tools/                # Tool modules for ADK implementation
 │   │   ├── __init__.py
 │   │   ├── command_tools.py  # Shell command execution tools
-│   │   ├── gcp_tools.py      # GCP project management tools
+│   │   ├── confirmation_tools.py # User confirmation tools
+│   │   ├── gcp_api_utils.py  # GCP API utilities
+│   │   ├── gcp_project.py    # GCP project management implementations
+│   │   ├── gcp_tools.py      # GCP tools imports/exports
+│   │   ├── gcp_vpc.py        # GCP VPC management implementations
 │   │   └── time_tools.py     # Time-related tools
 │
 ├── my_cli_agent/             # Direct API implementation
