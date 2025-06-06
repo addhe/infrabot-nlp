@@ -47,6 +47,7 @@ Infrabot-NLP adalah aplikasi Command Line Interface (CLI) yang dirancang untuk m
 
 ### 4.2. Tool Integration
 
+
 The application must support the following tools, callable via AI understanding of user intent:
 
 *   **FR2.1 Shell Command Execution:**
@@ -64,6 +65,8 @@ The application must support the following tools, callable via AI understanding 
         *   **FR2.3.4.2**: Create custom subnets within VPCs, specifying region, CIDR range, and private Google access settings.
         *   **FR2.3.4.3**: List existing VPC networks and their subnets in a specified project.
         *   **FR2.3.4.4**: Display detailed information about a specific VPC network, including its subnets, firewall rules, and peering connections.
+        *   **FR2.3.4.5**: Delete a subnet from a VPC network, with user confirmation and robust error handling (including fallback to CLI if API fails).
+        *   **FR2.3.4.6**: Enable or disable private Google access on existing subnets.
 
 ### 4.3. Configuration
 
