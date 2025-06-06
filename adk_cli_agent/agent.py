@@ -25,6 +25,7 @@ from .tools.gcp_tools import (
     get_vpc_details,
     delete_vpc_network,
     list_subnets,
+    delete_subnet,
     enable_private_google_access,
     disable_private_google_access
 )
@@ -78,6 +79,7 @@ if HAS_GCP_TOOLS_FLAG:
     tools.append(delete_vpc_network)
     # Subnet management tools
     tools.append(list_subnets)
+    tools.append(delete_subnet)
     tools.append(enable_private_google_access)
     tools.append(disable_private_google_access)
 else:
@@ -105,6 +107,7 @@ root_agent = Agent(
        - Get detailed information about a specific VPC network
        - Delete a VPC network (this will also delete all associated subnets)
        - List all subnets in a specific VPC network (using the subnet listing tool)
+       - Delete a specific subnet from a VPC network (requires subnet name and region)
        - Enable or disable private Google access on existing subnets
     
     For creating GCP projects, you need a project ID (which must be globally unique) and optionally

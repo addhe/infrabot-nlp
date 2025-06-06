@@ -9,5 +9,5 @@ from .gcp_vpc import (
     get_vpc_details,
     delete_vpc_network
 )
-from .gcp_subnet import list_subnets
+from .gcp_subnet import list_subnets, delete_subnet
 from .gcp_subnet_update import enable_private_google_access, disable_private_google_access
