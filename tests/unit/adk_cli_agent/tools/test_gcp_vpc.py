@@ -73,6 +73,12 @@ def mock_compute_networks_client():
         # Mock the get operation
         mock_client_instance.get.return_value = mock_network1
         
+        # Mock the delete operation
+        mock_delete_operation = MagicMock()
+        mock_delete_result = MagicMock()
+        mock_delete_operation.result.return_value = mock_delete_result
+        mock_client_instance.delete.return_value = mock_delete_operation
+        
         yield mock_client
 
 @pytest.fixture

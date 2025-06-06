@@ -8,6 +8,7 @@ as well as VPC management functions.
 import os
 import atexit
 import json
+
 from google.adk.agents import Agent
 
 # Import tools from their respective modules
@@ -21,7 +22,11 @@ from .tools.gcp_tools import (
     create_vpc_network,
     create_subnet,
     list_vpc_networks,
-    get_vpc_details
+    get_vpc_details,
+    delete_vpc_network,
+    list_subnets,
+    enable_private_google_access,
+    disable_private_google_access
 )
 
 def cleanup():
@@ -46,7 +51,7 @@ atexit.register(cleanup)
 
 # Get model ID from environment variable with fallback to a standard Gemini model
 # Use a model ID that is generally available and supports function calling
-model_id = os.getenv("GEMINI_MODEL_ID", "gemini-1.5-flash-8b")
+model_id = os.getenv("GEMINI_MODEL_ID", "gemini-2.0-flash-lite")
 
 
 # Create list of tools
@@ -70,6 +75,11 @@ if HAS_GCP_TOOLS_FLAG:
     tools.append(create_subnet)
     tools.append(list_vpc_networks)
     tools.append(get_vpc_details)
+    tools.append(delete_vpc_network)
+    # Subnet management tools
+    tools.append(list_subnets)
+    tools.append(enable_private_google_access)
+    tools.append(disable_private_google_access)
 else:
     print("GCP tools (project and VPC management) are NOT available due to missing dependencies (google-cloud-resource-manager, google-cloud-compute, or google-auth).")
 
@@ -87,11 +97,15 @@ root_agent = Agent(
        - Create new GCP projects
        - Delete existing GCP projects
     
+
     2. Manage VPC Networks:
        - Create new VPC networks with auto or custom subnet mode and global/regional routing
        - Create custom subnets within VPC networks with optional private Google access
        - List all VPC networks and their subnets
        - Get detailed information about a specific VPC network
+       - Delete a VPC network (this will also delete all associated subnets)
+       - List all subnets in a specific VPC network (using the subnet listing tool)
+       - Enable or disable private Google access on existing subnets
     
     For creating GCP projects, you need a project ID (which must be globally unique) and optionally
     a display name and organization ID. If no display name is provided, the project ID will be used as the name.
@@ -173,6 +187,23 @@ def main():
                 if isinstance(response, dict):
                     # Print all keys for debugging
                     print(f"[DEBUG] Dict keys: {list(response.keys())}")
+                    
+                    # First check for status key to handle any operation result
+                    if 'status' in response:
+                        status = response.get('status', '').lower()
+                        if status == 'error':
+                            print(f"\nError: {response.get('message', 'Unknown error')}")
+                            if 'details' in response:
+                                print(f"Details: {response['details']}")
+                            pretty_printed = True
+                        elif status == 'warning':
+                            print(f"\nWarning: {response.get('message', 'Unknown warning')}")
+                            pretty_printed = True
+                        elif status == 'success':
+                            print(f"\nSuccess: {response.get('message', 'Operation completed successfully')}")
+                            pretty_printed = True
+                    
+                    # Then continue with specific data type handling
                     if 'projects' in response:
                         projects = response['projects']
                         last_projects_cache = projects
@@ -189,9 +220,10 @@ def main():
                         print("\nVPC Networks:")
                         for net in networks:
                             print(f"- {net.get('name', '')} (ID: {net.get('id', '')}) [subnet_mode: {net.get('subnet_mode', '')}, routing_mode: {net.get('routing_mode', '')}]")
-                            if net.get('subnets'):
-                                for subnet in net['subnets']:
-                                    print(f"    - Subnet: {subnet.get('name', '')} | Region: {subnet.get('region', '')} | CIDR: {subnet.get('cidr_range', '')} | Private Google Access: {subnet.get('private_google_access', False)}")
+                            # Do not print subnets here; instruct user to use the subnet tool for details
+                            # Optionally, show subnet count if available
+                            subnet_count = len(net.get('subnets', [])) if 'subnets' in net and isinstance(net['subnets'], list) else 'unknown'
+                            print(f"    [Use 'list_subnets' or ask for subnet details to see subnets. Subnet count: {subnet_count}]")
                         print()
                         pretty_printed = True
                     # Debug print for VPC details
@@ -199,6 +231,19 @@ def main():
                         print("[DEBUG] VPC network details:")
                         print(json.dumps(response['network'], indent=2))
                         pretty_printed = True
+                    
+                    # Specific handling for subnet creation results
+                    if 'subnet' in response and response.get('status') != 'error':
+                        # Only print subnet details if we haven't already handled the response through status
+                        if not pretty_printed:
+                            print(f"\nSubnet operation result:")
+                            subnet = response['subnet']
+                            print(f"- Name: {subnet.get('name', '')}")
+                            print(f"- Region: {subnet.get('region', '')}")
+                            print(f"- CIDR Range: {subnet.get('cidr_range', '')}")
+                            print(f"- Private Google Access: {subnet.get('private_google_access', False)}")
+                            print()
+                            pretty_printed = True
                     if response.get('status') == 'error':
                         print(f"Error: {response.get('message', 'Unknown error')}")
                         if 'details' in response:

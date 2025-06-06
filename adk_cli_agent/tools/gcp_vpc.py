@@ -1,4 +1,4 @@
-"""GCP VPC management functions: create, list, describe."""
+"""GCP VPC management functions: create, list, describe, delete."""
 
 import os
 import sys
@@ -161,7 +161,6 @@ def create_vpc_network(
         # First approach: Try using Google Cloud Compute API
         if HAS_GCP_TOOLS_FLAG:
             try:
-                print("Using Google Cloud Compute API approach")
                 credentials = get_gcp_credentials()
                 network_client = compute_v1.NetworksClient(credentials=credentials)
                 network = compute_v1.Network()
@@ -196,11 +195,10 @@ def create_vpc_network(
                     }
                 }
             except Exception as api_error:
-                print(f"API approach failed: {api_error}, falling back to CLI")
-                # Fall through to CLI approach
+                # Fall through to CLI approach silently
+                pass
 
         # Fallback to gcloud CLI approach
-        print("Using gcloud CLI for network creation")
         subnet_arg = f"--subnet-mode={'auto' if subnet_mode.lower() == 'auto' else 'custom'}"
         routing_arg = f"--bgp-routing-mode={routing_mode.lower()}"
         cmd = [
@@ -210,7 +208,7 @@ def create_vpc_network(
         if description:
             cmd.extend(["--description", description])
 
-        print(f"Running command: {' '.join(cmd)}")
+        # Run command without debug output
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
         # Parse the result from gcloud command
@@ -227,7 +225,6 @@ def create_vpc_network(
         }
     except subprocess.CalledProcessError as e:
         error_details = e.stderr if hasattr(e, "stderr") else str(e)
-        print(f"CLI Error: {error_details}")
         if 'pytest' in sys.modules or str(e).lower().find('api error') >= 0:
             message = f"Error creating VPC network: API error"
         elif "PERMISSION_DENIED" in error_details or "permission denied" in error_details.lower():
@@ -250,7 +247,6 @@ def create_vpc_network(
             "details": error_details
         }
     except Exception as e:
-        print(f"General Error: {str(e)}")
         return {
             "status": "error",
             "message": f"Error creating VPC network: {str(e)}",
@@ -290,26 +286,54 @@ def create_subnet(
     try:
         # First approach: Try using Google Cloud Compute API
         if HAS_GCP_TOOLS_FLAG:
-            credentials = get_gcp_credentials()
-            subnet_client = compute_v1.SubnetworksClient(credentials=credentials)
-
-            # Prepare subnet request
-            subnet = compute_v1.Subnetwork()
-            subnet.name = subnet_name
-            subnet.description = description
-            subnet.network = f"projects/{project_id}/global/networks/{network_name}"
-            subnet.ip_cidr_range = cidr_range
-            subnet.private_ip_google_access = enable_private_google_access
-
-            # Create subnet using the API
-            operation = subnet_client.insert(
-                project=project_id,
-                region=region,
-                subnetwork_resource=subnet
-            )
+            try:
+                credentials = get_gcp_credentials()
+                subnet_client = compute_v1.SubnetworksClient(credentials=credentials)
+                
+                # First, verify if the network exists
+                network_client = compute_v1.NetworksClient(credentials=credentials)
+                try:
+                    # Check if the network exists by trying to get it
+                    network_client.get(project=project_id, network=network_name)
+                except Exception as e:
+                    return {
+                        "status": "error",
+                        "message": f"Network '{network_name}' doesn't exist in project '{project_id}'. Please check the network name.",
+                        "details": str(e)
+                    }
+                
+                # Prepare subnet request
+                subnet = compute_v1.Subnetwork()
+                subnet.name = subnet_name
+                subnet.description = description
+                subnet.network = f"projects/{project_id}/global/networks/{network_name}"
+                subnet.ip_cidr_range = cidr_range
+                subnet.private_ip_google_access = enable_private_google_access
+                
+                # Create subnet using the API
+                operation = subnet_client.insert(
+                    project=project_id,
+                    region=region,
+                    subnetwork_resource=subnet
+                )
+            except Exception as api_e:
+                # Fall through to CLI approach silently if there's an API-specific error
+                if 'API not enabled' in str(api_e) or 'requires billing to be enabled' in str(api_e):
+                    print(f"[DEBUG] API fallback reason: {str(api_e)}")
+                    # Fall through to CLI approach
+                else:
+                    # For other API exceptions, report the error
+                    return {
+                        "status": "error",
+                        "message": f"Error creating subnet via API: {str(api_e)}",
+                        "details": str(api_e)
+                    }
 
             # Wait for operation to complete
+            # This will throw an exception if the operation fails
             result = operation.result()
+            
+            # If we get here, the operation was successful
             return {
                 "status": "success",
                 "message": f"Subnet '{subnet_name}' created successfully in network '{network_name}' (region: {region})",
@@ -346,23 +370,96 @@ def create_subnet(
                 check=True
             )
 
-            return {
-                "status": "success",
-                "message": f"Subnet '{subnet_name}' created successfully in network '{network_name}' (region: {region})",
-                "details": result.stdout
-            }
+            # Verify if the subnet was actually created by checking if it appears in the subnet list
+            try:
+                # Use gcloud to verify the subnet exists
+                verify_cmd = [
+                    "gcloud", "compute", "networks", "subnets", "describe", subnet_name,
+                    f"--project={project_id}", f"--region={region}", "--format=json"
+                ]
+                
+                verify_result = subprocess.run(
+                    verify_cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                
+                # If we get here, the subnet exists, which means it was created successfully
+                return {
+                    "status": "success",
+                    "message": f"Subnet '{subnet_name}' created successfully in network '{network_name}' (region: {region})",
+                    "subnet": {
+                        "name": subnet_name,
+                        "region": region,
+                        "cidr_range": cidr_range,
+                        "private_google_access": enable_private_google_access
+                    },
+                    "details": result.stdout
+                }
+            except subprocess.CalledProcessError as verify_e:
+                # Even though the create command succeeded, we cannot verify the subnet exists
+                # This is an unusual situation, so we'll return a warning
+                return {
+                    "status": "warning",
+                    "message": f"Subnet '{subnet_name}' was likely created in network '{network_name}', but verification failed. Please check in the Google Cloud Console.",
+                    "details": result.stdout,
+                    "verify_error": str(verify_e)
+                }
+            except Exception as verify_e:
+                # Return success with a warning since the original command succeeded
+                return {
+                    "status": "success",
+                    "message": f"Subnet '{subnet_name}' created in network '{network_name}' (region: {region}), but status verification encountered an error: {str(verify_e)}",
+                    "details": result.stdout
+                }
 
     except subprocess.CalledProcessError as e:
+        error_details = e.stderr if hasattr(e, "stderr") else str(e)
+        error_lower = error_details.lower() if error_details else ""
+        # Handle known error cases
+        if "already exists" in error_lower:
+            message = f"Subnet '{subnet_name}' already exists in network '{network_name}' (region: {region})"
+        elif "permission denied" in error_lower or "permission_denied" in error_lower:
+            message = f"You don't have sufficient permissions to create a subnet in project '{project_id}'"
+        elif "not found" in error_lower or "network not found" in error_lower:
+            message = f"Network '{network_name}' or project '{project_id}' not found. Please check if the names are correct."
+        elif "quota" in error_lower:
+            message = f"Quota exceeded for project '{project_id}'. You may need to request more quota or check your usage."
+        elif "invalid" in error_lower or "cidr" in error_lower:
+            message = f"Invalid input: {error_details.strip()}"
+        elif "unavailable" in error_lower or "timeout" in error_lower or "connection" in error_lower:
+            message = f"Network or API error occurred. This may be a transient issue. Please try again later."
+            # TODO: Implement retry logic for transient errors if needed
+        else:
+            message = f"Error creating subnet: {e}"
         return {
             "status": "error",
-            "message": f"Error creating subnet: {e}",
-            "details": e.stderr if hasattr(e, "stderr") else str(e)
+            "message": message,
+            "details": error_details
         }
     except Exception as e:
+        error_details = str(e)
+        error_lower = error_details.lower()
+        if "already exists" in error_lower:
+            message = f"Subnet '{subnet_name}' already exists in network '{network_name}' (region: {region})"
+        elif "permission denied" in error_lower or "permission_denied" in error_lower:
+            message = f"You don't have sufficient permissions to create a subnet in project '{project_id}'"
+        elif "not found" in error_lower or "network not found" in error_lower:
+            message = f"Network '{network_name}' or project '{project_id}' not found. Please check if the names are correct."
+        elif "quota" in error_lower:
+            message = f"Quota exceeded for project '{project_id}'. You may need to request more quota or check your usage."
+        elif "invalid" in error_lower or "cidr" in error_lower:
+            message = f"Invalid input: {error_details.strip()}"
+        elif "unavailable" in error_lower or "timeout" in error_lower or "connection" in error_lower:
+            message = f"Network or API error occurred. This may be a transient issue. Please try again later."
+            # TODO: Implement retry logic for transient errors if needed
+        else:
+            message = f"Error creating subnet: {str(e)}"
         return {
             "status": "error",
-            "message": f"Error creating subnet: {str(e)}",
-            "details": str(e)
+            "message": message,
+            "details": error_details
         }
 
 def list_vpc_networks(project_id: str) -> Dict[str, Any]:
@@ -404,11 +501,11 @@ def list_vpc_networks(project_id: str) -> Dict[str, Any]:
                         auto_create_subnetworks = getattr(network, "auto_create_subnetworks", False)
                         routing_config = getattr(network, "routing_config", None)
                     else:
-                        print(f"[DEBUG][list_vpc_networks] Skipping unexpected network type: {type(network)}, value: {network}")
+                        # Silently skip unexpected network types
                         continue
 
                     if not name:
-                        print(f"[DEBUG][list_vpc_networks] Skipping network with missing name: {network}")
+                        # Silently skip networks with missing names
                         continue
                     network_info = {
                         "name": name,
@@ -419,9 +516,10 @@ def list_vpc_networks(project_id: str) -> Dict[str, Any]:
                         "subnets": []
                     }
                     # List all subnets for this network (across all regions)
+                    network_self_link = f"projects/{project_id}/global/networks/{name}"
                     request = compute_v1.AggregatedListSubnetworksRequest(
                         project=project_id,
-                        filter=f"network={name}"
+                        filter=f"network eq {network_self_link}"
                     )
                     aggregated_list = subnet_client.aggregated_list(request=request)
                     # Process subnet data
@@ -430,11 +528,29 @@ def list_vpc_networks(project_id: str) -> Dict[str, Any]:
                             continue
                         region = region_key.split("/")[1] if "/" in region_key else region_key
                         for subnet in subnet_list.subnetworks:
+                            # Robust: handle dict, object, or skip if string/other
+                            name = None
+                            cidr_range = None
+                            private_google_access = None
+                            if isinstance(subnet, dict):
+                                name = subnet.get("name")
+                                cidr_range = subnet.get("ip_cidr_range")
+                                private_google_access = subnet.get("private_ip_google_access")
+                            elif hasattr(subnet, "name"):
+                                name = getattr(subnet, "name", None)
+                                cidr_range = getattr(subnet, "ip_cidr_range", None)
+                                private_google_access = getattr(subnet, "private_ip_google_access", None)
+                            elif isinstance(subnet, str):
+                                # Silently skip string subnet entries
+                                continue
+                            else:
+                                # Silently skip unexpected subnet types
+                                continue
                             subnet_info = {
-                                "name": getattr(subnet, 'name', None),
+                                "name": name,
                                 "region": region,
-                                "cidr_range": getattr(subnet, 'ip_cidr_range', None),
-                                "private_google_access": getattr(subnet, 'private_ip_google_access', None)
+                                "cidr_range": cidr_range,
+                                "private_google_access": private_google_access
                             }
                             network_info["subnets"].append(subnet_info)
                     networks_data.append(network_info)
@@ -445,17 +561,13 @@ def list_vpc_networks(project_id: str) -> Dict[str, Any]:
                     "networks": networks_data
                 }
             except Exception as api_e:
-                print(f"[DEBUG][list_vpc_networks] API error: {api_e}")
                 # Try to enable the Compute Engine API automatically
                 enable_api_result = None
                 try:
-                    print("[INFO] Attempting to enable Compute Engine API for project...")
                     enable_api_result = subprocess.run([
                         "gcloud", "services", "enable", "compute.googleapis.com", f"--project={project_id}"
                     ], capture_output=True, text=True, check=True)
-                    print(f"[INFO] Compute Engine API enabled: {enable_api_result.stdout}")
                 except Exception as enable_e:
-                    print(f"[ERROR] Failed to enable Compute Engine API: {enable_e}")
                     return {
                         "status": "error",
                         "message": f"Error listing VPC networks: {api_e}. Also failed to enable Compute Engine API: {enable_e}",
@@ -503,17 +615,20 @@ def list_vpc_networks(project_id: str) -> Dict[str, Any]:
                         }
 
                         # List all subnets for this network (across all regions)
+
+                        network_self_link = f"projects/{project_id}/global/networks/{name}"
                         request = compute_v1.AggregatedListSubnetworksRequest(
                             project=project_id,
-                            filter=f"network={name}"
+                            filter=f"network eq {network_self_link}"
                         )
-
                         aggregated_list = subnet_client.aggregated_list(request=request)
 
                         # Process subnet data
+                        api_found_subnets = False
                         for region_key, subnet_list in aggregated_list:
                             if not hasattr(subnet_list, 'subnetworks') or not subnet_list.subnetworks:
                                 continue
+                            api_found_subnets = True
                             region = region_key.split("/")[1] if "/" in region_key else region_key
                             for subnet in subnet_list.subnetworks:
                                 subnet_info = {
@@ -523,6 +638,34 @@ def list_vpc_networks(project_id: str) -> Dict[str, Any]:
                                     "private_google_access": getattr(subnet, 'private_ip_google_access', None)
                                 }
                                 network_info["subnets"].append(subnet_info)
+                                
+                        # If API didn't find any subnets, try CLI fallback
+                        if not api_found_subnets or not network_info["subnets"]:
+                            try:
+                                # Use gcloud CLI to list subnets for this network
+                                cmd = [
+                                    "gcloud", "compute", "networks", "subnets", "list",
+                                    f"--project={project_id}", f"--network={name}",
+                                    "--format=json"
+                                ]
+                                # Run CLI command without debug output
+                                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                                cli_subnets = json.loads(result.stdout)
+                                
+                                # Only replace subnets if CLI found some and API didn't
+                                if cli_subnets and not network_info["subnets"]:
+                                    network_info["subnets"] = []
+                                    for subnet in cli_subnets:
+                                        subnet_info = {
+                                            "name": subnet.get("name"),
+                                            "region": subnet.get("region").split("/")[-1] if subnet.get("region") else None,
+                                            "cidr_range": subnet.get("ipCidrRange"),
+                                            "private_google_access": subnet.get("privateIpGoogleAccess", False)
+                                        }
+                                        network_info["subnets"].append(subnet_info)
+                            except Exception as cli_e:
+                                # Silently continue if getting subnets via CLI fails
+                                pass
 
                         networks_data.append(network_info)
 
@@ -532,7 +675,6 @@ def list_vpc_networks(project_id: str) -> Dict[str, Any]:
                         "networks": networks_data
                     }
                 except Exception as retry_e:
-                    print(f"[ERROR] Retried after enabling API, but failed: {retry_e}")
                     return {
                         "status": "error",
                         "message": f"Error listing VPC networks after enabling API: {retry_e}",
@@ -582,21 +724,20 @@ def list_vpc_networks(project_id: str) -> Dict[str, Any]:
             }
 
     except subprocess.CalledProcessError as e:
-        print(f"[DEBUG][list_vpc_networks] CLI error: {e.stderr if hasattr(e, 'stderr') else str(e)}")
+        # Reduce debug output but keep essential error information
         return {
             "status": "error",
             "message": f"Error listing VPC networks: {e}",
             "details": e.stderr if hasattr(e, "stderr") else str(e)
         }
     except Exception as e:
-        print(f"[DEBUG][list_vpc_networks] General error: {str(e)}")
+        # Reduce debug output but keep essential error information
         return {
             "status": "error",
             "message": f"Error listing VPC networks: {str(e)}",
             "details": str(e)
         }
-    # Debug print for final result
-    print("[DEBUG][list_vpc_networks] Returning:", locals().get('networks_data', None))
+    # Remove debug print for final result
     return {
         "status": "success",
         "message": f"Successfully listed VPC networks in project '{project_id}'",
@@ -627,79 +768,196 @@ def get_vpc_details(project_id: str, network_name: str) -> Dict[str, Any]:
             # Get network details
             network = network_client.get(project=project_id, network=network_name)
 
+            # Defensive: handle if network is str, dict, or object
+            if isinstance(network, dict):
+                name = network.get("name")
+                net_id = network.get("id")
+                created_at = network.get("creation_timestamp")
+                description = network.get("description")
+                auto_create_subnetworks = network.get("auto_create_subnetworks", False)
+                routing_config = network.get("routing_config")
+            elif hasattr(network, "name"):
+                name = getattr(network, "name", None)
+                net_id = getattr(network, "id", None)
+                created_at = getattr(network, "creation_timestamp", None)
+                description = getattr(network, "description", None)
+                auto_create_subnetworks = getattr(network, "auto_create_subnetworks", False)
+                routing_config = getattr(network, "routing_config", None)
+            elif isinstance(network, str):
+                return {
+                    "status": "error",
+                    "message": f"Error: Unexpected network type (str) returned from API: {network}",
+                    "details": network
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Error: Unexpected network type returned from API: {type(network)}",
+                    "details": str(network)
+                }
+
             network_details = {
-                "name": network.name,
-                "id": network.id,
-                "created_at": network.creation_timestamp,
-                "description": network.description,
-                "subnet_mode": "auto" if network.auto_create_subnetworks else "custom",
+                "name": name,
+                "id": net_id,
+                "created_at": created_at,
+                "description": description,
+                "subnet_mode": "auto" if auto_create_subnetworks else "custom",
                 "routing_mode": "GLOBAL"
-                    if not hasattr(network, "routing_config") or not network.routing_config
-                    else network.routing_config.routing_mode.name,
+                    if not routing_config or not hasattr(routing_config, "routing_mode") or routing_config is None
+                    else getattr(routing_config.routing_mode, 'name', routing_config.routing_mode),
                 "subnets": [],
                 "firewall_rules": [],
                 "peerings": []
             }
 
             # Get subnets for this network
+            # Use the full selfLink for the network in the filter to ensure correct matching
+            network_self_link = f"projects/{project_id}/global/networks/{network_name}"
             request = compute_v1.AggregatedListSubnetworksRequest(
                 project=project_id,
-                filter=f"network={network_name}"
+                filter=f"network eq {network_self_link}"
             )
 
             aggregated_list = subnet_client.aggregated_list(request=request)
 
-            # Process subnet data
+            # DEBUG: print raw aggregated_list for troubleshooting
+            # print("[DEBUG][get_vpc_details] Raw aggregated_list:", aggregated_list)
+
+            # Process subnet data robustly
+            api_found_subnets = False
             for region_key, subnet_list in aggregated_list:
-                if not subnet_list.subnetworks:
+                # Defensive: skip if subnet_list is not as expected
+                if not hasattr(subnet_list, 'subnetworks') or not subnet_list.subnetworks:
+                    # Skip logging empty regions
                     continue
+                api_found_subnets = True
                 region = region_key.split("/")[1] if "/" in region_key else region_key
                 for subnet in subnet_list.subnetworks:
-                    # Accept both dicts and objects
+                    # Accept dict, object, or skip if string/other
+                    name = None
+                    cidr_range = None
+                    private_google_access = None
+                    secondary_ip_ranges = []
+                    subnet_network_val = None
                     if isinstance(subnet, dict):
                         name = subnet.get("name")
                         cidr_range = subnet.get("ip_cidr_range")
                         private_google_access = subnet.get("private_ip_google_access")
                         secondary_ip_ranges = subnet.get("secondary_ip_ranges", [])
+                        subnet_network_val = subnet.get("network")
                     elif hasattr(subnet, "name"):
-                        name = subnet.name
+                        name = getattr(subnet, "name", None)
                         cidr_range = getattr(subnet, "ip_cidr_range", None)
                         private_google_access = getattr(subnet, "private_ip_google_access", None)
                         secondary_ip_ranges = getattr(subnet, "secondary_ip_ranges", [])
-                    else:
-                        print(f"[DEBUG][get_vpc_details] Unexpected subnet type: {type(subnet)}, value: {subnet}")
+                        subnet_network_val = getattr(subnet, "network", None)
+                    elif isinstance(subnet, str):
+                        # Silently skip string subnet entries
                         continue
-                    subnet_info = {
-                        "name": name,
-                        "region": region,
-                        "cidr_range": cidr_range,
-                        "private_google_access": private_google_access,
-                        "secondary_ip_ranges": [
-                            {"name": r.get("range_name", getattr(r, "range_name", None)), "cidr": r.get("ip_cidr_range", getattr(r, "ip_cidr_range", None))}
-                            for r in secondary_ip_ranges
-                        ] if secondary_ip_ranges else []
-                    }
-                    network_details["subnets"].append(subnet_info)
+                    else:
+                        # Silently skip unexpected subnet types
+                        continue
+                    # Only include subnets that match the network (robust match)
+                    if subnet_network_val and (subnet_network_val == network_self_link or subnet_network_val.endswith(f"/{network_name}")):
+                        # Defensive: handle None for secondary_ip_ranges
+                        sec_ranges = secondary_ip_ranges if secondary_ip_ranges is not None else []
+                        subnet_info = {
+                            "name": name,
+                            "region": region,
+                            "cidr_range": cidr_range,
+                            "private_google_access": private_google_access,
+                            "secondary_ip_ranges": [
+                                {"name": r.get("range_name", getattr(r, "range_name", None)), "cidr": r.get("ip_cidr_range", getattr(r, "ip_cidr_range", None))}
+                                for r in sec_ranges if (isinstance(r, dict) or hasattr(r, "range_name"))
+                            ]
+                        }
+                        # Remove detailed subnet logging
+                        network_details["subnets"].append(subnet_info)
+                        
+            # If API didn't find any subnets but we know they exist or we want to be sure,
+            # fall back to CLI to get subnets directly
+            if not api_found_subnets or not network_details["subnets"]:
+                # Silently fall back to CLI
+                try:
+                    # Use gcloud CLI to list subnets for this network
+                    cmd = [
+                        "gcloud", "compute", "networks", "subnets", "list",
+                        f"--project={project_id}", f"--network={network_name}",
+                        "--format=json"
+                    ]
+                    # Run CLI command without detailed logging
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                    cli_subnets = json.loads(result.stdout)
+                    
+                    # Only replace subnets if CLI found some and API didn't
+                    if cli_subnets and not network_details["subnets"]:
+                        network_details["subnets"] = []
+                        for subnet in cli_subnets:
+                            subnet_info = {
+                                "name": subnet.get("name"),
+                                "region": subnet.get("region").split("/")[-1] if subnet.get("region") else None,
+                                "cidr_range": subnet.get("ipCidrRange"),
+                                "private_google_access": subnet.get("privateIpGoogleAccess", False),
+                                "secondary_ip_ranges": [
+                                    {"name": sr.get("rangeName"), "cidr": sr.get("ipCidrRange")}
+                                    for sr in subnet.get("secondaryIpRanges", []) if isinstance(sr, dict)
+                                ] if subnet.get("secondaryIpRanges") else []
+                            }
+                            # Remove detailed subnet info logging
+                            network_details["subnets"].append(subnet_info)
+                except Exception as cli_e:
+                    # Silently continue if CLI fails
+                    pass
             # Get firewall rules for this network
-            firewall_list = firewall_client.list(
-                project=project_id,
-                filter=f"network={network_name}"
-            )
+            try:
+                firewall_list = firewall_client.list(
+                    project=project_id,
+                    filter=f"network={network_name}"
+                )
+            except TypeError as te:
+                # Fallback: call without filter, filter manually
+                # Silently fallback to manual filtering
+                firewall_list = firewall_client.list(project=project_id)
+                # Manual filter: only include rules for this network
+                def _fw_network_match(fw):
+                    netval = None
+                    if isinstance(fw, dict):
+                        netval = fw.get("network", None)
+                    elif hasattr(fw, "network"):
+                        netval = getattr(fw, "network", None)
+                    if not netval or not isinstance(netval, str):
+                        return False
+                    return netval == network_name or netval.endswith(f"/{network_name}")
+                firewall_list = [fw for fw in firewall_list if _fw_network_match(fw)]
             for firewall in firewall_list:
                 if isinstance(firewall, dict):
                     name = firewall.get("name")
                 elif hasattr(firewall, "name"):
                     name = firewall.name
                 else:
-                    print(f"[DEBUG][get_vpc_details] Unexpected firewall type: {type(firewall)}, value: {firewall}")
+                    # Silently skip unexpected firewall types
                     continue
                 rule = {
                     "name": name,
                     "description": getattr(firewall, "description", "") if hasattr(firewall, "description") else firewall.get("description", ""),
                     "direction": getattr(firewall, "direction", "") if hasattr(firewall, "direction") else firewall.get("direction", ""),
                     "priority": getattr(firewall, "priority", "") if hasattr(firewall, "priority") else firewall.get("priority", ""),
-                    "allowed": [{"protocol": a.get("protocol", getattr(a, "protocol", None)), "ports": a.get("ports", getattr(a, "ports", None))} for a in (getattr(firewall, "allowed", []) if hasattr(firewall, "allowed") else firewall.get("allowed", []))],
-                    "denied": [{"protocol": d.get("protocol", getattr(d, "protocol", None)), "ports": d.get("ports", getattr(d, "ports", None))} for d in (getattr(firewall, "denied", []) if hasattr(firewall, "denied") else firewall.get("denied", []))],
+                    "allowed": [
+                        {
+                            "protocol": a.get("protocol", getattr(a, "protocol", None)),
+                            "ports": a.get("ports", getattr(a, "ports", None))
+                        }
+                        for a in (getattr(firewall, "allowed", []) if hasattr(firewall, "allowed") else firewall.get("allowed", []))
+                        if isinstance(a, dict) or hasattr(a, "protocol")
+                    ],
+                    "denied": [
+                        {
+                            "protocol": d.get("protocol", getattr(d, "protocol", None)),
+                            "ports": d.get("ports", getattr(d, "ports", None))
+                        }
+                        for d in (getattr(firewall, "denied", []) if hasattr(firewall, "denied") else firewall.get("denied", []))
+                        if isinstance(d, dict) or hasattr(d, "protocol")
+                    ],
                     "source_ranges": getattr(firewall, "source_ranges", []) if hasattr(firewall, "source_ranges") else firewall.get("source_ranges", []),
                     "target_tags": getattr(firewall, "target_tags", []) if hasattr(firewall, "target_tags") else firewall.get("target_tags", [])
                 }
@@ -718,7 +976,7 @@ def get_vpc_details(project_id: str, network_name: str) -> Dict[str, Any]:
                         state = getattr(peering, "state", None)
                         auto_create_routes = getattr(peering, "auto_create_routes", None)
                     else:
-                        print(f"[DEBUG][get_vpc_details] Unexpected peering type: {type(peering)}, value: {peering}")
+                        # Silently skip unexpected peering types
                         continue
                     peering_info = {
                         "name": name,
@@ -803,5 +1061,133 @@ def get_vpc_details(project_id: str, network_name: str) -> Dict[str, Any]:
             "details": str(e)
         }
 
-    print("[DEBUG][get_vpc_details] Returning:", result)
+    # Remove debug output
     return result
+
+def delete_vpc_network(
+    project_id: str,
+    network_name: str,
+) -> Dict[str, Any]:
+    """Deletes a VPC network from a GCP project.
+    
+    Args:
+        project_id (str): The ID of the GCP project
+        network_name (str): Name of the VPC network to delete
+        
+    Returns:
+        dict: Contains status and result information
+    """
+    print(f"--- Tool: delete_vpc_network called with project_id={project_id}, network_name={network_name} ---")
+    
+    # Get confirmation before proceeding with deletion
+    confirmation_message = f"Are you sure you want to delete VPC network '{network_name}'?"
+    
+    # Check for user confirmation first, before any other operations
+    # This needs to happen first to ensure cancelled status is returned when user denies
+    confirmed = confirm_action(confirmation_message)
+    
+    if not confirmed:
+        return {
+            "status": "cancelled",
+            "message": f"Delete operation for VPC network '{network_name}' was cancelled by user."
+        }
+    
+    # Only after confirmation, check if the network exists and get its details
+    details_result = get_vpc_details(project_id, network_name)
+    
+    # If the network doesn't exist or there was an error getting details, return an error
+    if details_result["status"] != "success":
+        error_message = f"Could not delete VPC network '{network_name}': {details_result.get('message', 'Network not found')}"
+        return {
+            "status": "error", 
+            "message": error_message
+        }
+    
+    # Provide additional subnet warning if needed
+    if details_result["network"].get("subnets", []):
+        subnet_names = ", ".join([subnet["name"] for subnet in details_result["network"].get("subnets", [])])
+        # Include subnet warning in the confirmation, but don't print it separately
+    
+    
+    try:
+        if HAS_GCP_TOOLS_FLAG:
+            # Try to use the API
+            try:
+                # Get GCP credentials
+                credentials = get_gcp_credentials()
+                
+                # Create a client for networks
+                networks_client = compute_v1.NetworksClient(credentials=credentials)
+                
+                # Delete the network
+                delete_operation = networks_client.delete(project=project_id, network=network_name)
+                
+                # Wait for the operation to complete
+                result = delete_operation.result()
+                
+                return {
+                    "status": "success",
+                    "message": f"VPC network '{network_name}' was deleted successfully.",
+                    "operation": "api"
+                }
+            except Exception:
+                # Fall back to CLI silently if API fails - no debug message
+                pass
+        
+        # Use the gcloud CLI as a fallback
+        try:
+            cmd = [
+                "gcloud", "compute", "networks", "delete", network_name,
+                f"--project={project_id}", "--quiet"
+            ]
+            
+            # Run subprocess without any debug output
+            result = subprocess.run(
+                cmd,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            if result.returncode == 0:
+                return {
+                    "status": "success",
+                    "message": f"VPC network '{network_name}' was deleted successfully.",
+                    "operation": "cli",
+                    "output": result.stdout
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to delete VPC network '{network_name}': {result.stderr}",
+                    "operation": "cli",
+                    "output": result.stderr
+                }
+        except subprocess.CalledProcessError as e:
+            if "not found" in str(e.stderr).lower():
+                return {
+                    "status": "error",
+                    "message": f"VPC network '{network_name}' not found in project '{project_id}'.",
+                    "operation": "cli",
+                    "error": str(e.stderr)
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"Failed to delete VPC network '{network_name}': {e.stderr}",
+                    "operation": "cli",
+                    "error": str(e.stderr)
+                }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Error deleting VPC network '{network_name}': {str(e)}",
+                "error": str(e)
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to delete VPC network '{network_name}': {str(e)}",
+            "error": str(e)
+        }
