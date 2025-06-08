@@ -13,7 +13,14 @@ def mock_get_gcp_credentials():
         yield mock_credentials
 
 @pytest.fixture
-def mock_compute_subnetworks_client():
+def mock_compute_v1_subnetwork():
+    """Mock the compute_v1.Subnetwork class."""
+    mock_subnetwork_class = MagicMock()
+    with patch("adk_cli_agent.tools.gcp_subnet_update.compute_v1.Subnetwork", return_value=mock_subnetwork_class):
+        yield mock_subnetwork_class
+
+@pytest.fixture
+def mock_compute_subnetworks_client(mock_compute_v1_subnetwork):
     """Mock GCP Compute Subnetworks Client."""
     with patch("adk_cli_agent.tools.gcp_subnet_update.compute_v1.SubnetworksClient", create=True) as mock_client:
         mock_client_instance = MagicMock()
@@ -22,6 +29,7 @@ def mock_compute_subnetworks_client():
         # Mock subnet get operation
         mock_subnet = MagicMock()
         mock_subnet.private_ip_google_access = False
+        mock_subnet.fingerprint = "test-fingerprint"
         mock_client_instance.get.return_value = mock_subnet
         
         # Mock patch operation
@@ -49,7 +57,7 @@ class TestEnablePrivateGoogleAccess:
     """Tests for enable_private_google_access function."""
     
     @patch("adk_cli_agent.tools.gcp_subnet_update.HAS_GCP_TOOLS_FLAG", True)
-    def test_api_success(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_confirmation):
+    def test_api_success(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_compute_v1_subnetwork, mock_confirmation):
         """Test enabling private Google access using the API successfully."""
         result = enable_private_google_access(
             project_id="test-project", 
@@ -62,6 +70,13 @@ class TestEnablePrivateGoogleAccess:
         mock_client_instance.get.assert_called_once()
         mock_client_instance.patch.assert_called_once()
         
+        # Verify subnetwork_resource parameter in patch call
+        patch_call_kwargs = mock_client_instance.patch.call_args.kwargs
+        assert "subnetwork_resource" in patch_call_kwargs
+        subnet_update = patch_call_kwargs["subnetwork_resource"]
+        assert subnet_update.private_ip_google_access is True
+        assert subnet_update.fingerprint == "test-fingerprint"
+        
         # Check the result
         assert result["status"] == "success"
         assert "subnet" in result
@@ -70,7 +85,7 @@ class TestEnablePrivateGoogleAccess:
         assert result["subnet"]["private_google_access"] is True
     
     @patch("adk_cli_agent.tools.gcp_subnet_update.HAS_GCP_TOOLS_FLAG", True)
-    def test_already_enabled(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_confirmation):
+    def test_already_enabled(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_compute_v1_subnetwork, mock_confirmation):
         """Test when private Google access is already enabled."""
         # Set the mock subnet's private_ip_google_access to True
         mock_client_instance = mock_compute_subnetworks_client.return_value
@@ -125,7 +140,7 @@ class TestDisablePrivateGoogleAccess:
     """Tests for disable_private_google_access function."""
     
     @patch("adk_cli_agent.tools.gcp_subnet_update.HAS_GCP_TOOLS_FLAG", True)
-    def test_api_success(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_confirmation):
+    def test_api_success(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_compute_v1_subnetwork, mock_confirmation):
         """Test disabling private Google access using the API successfully."""
         # Set the mock subnet's private_ip_google_access to True
         mock_client_instance = mock_compute_subnetworks_client.return_value
@@ -141,13 +156,20 @@ class TestDisablePrivateGoogleAccess:
         mock_client_instance.get.assert_called_once()
         mock_client_instance.patch.assert_called_once()
         
+        # Verify subnetwork_resource parameter in patch call
+        patch_call_kwargs = mock_client_instance.patch.call_args.kwargs
+        assert "subnetwork_resource" in patch_call_kwargs
+        subnet_update = patch_call_kwargs["subnetwork_resource"]
+        assert subnet_update.private_ip_google_access is False
+        assert subnet_update.fingerprint == "test-fingerprint"
+        
         # Check the result
         assert result["status"] == "success"
         assert "subnet" in result
         assert result["subnet"]["private_google_access"] is False
     
     @patch("adk_cli_agent.tools.gcp_subnet_update.HAS_GCP_TOOLS_FLAG", True)
-    def test_already_disabled(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_confirmation):
+    def test_already_disabled(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_compute_v1_subnetwork, mock_confirmation):
         """Test when private Google access is already disabled."""
         # Subnet's private_ip_google_access is already False by default in the fixture
         
