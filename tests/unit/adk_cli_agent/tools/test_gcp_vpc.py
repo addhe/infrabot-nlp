@@ -79,7 +79,7 @@ def mock_compute_networks_client():
         mock_delete_operation.result.return_value = mock_delete_result
         mock_client_instance.delete.return_value = mock_delete_operation
         
-        yield mock_client
+        yield mock_client_instance # Yield the instance, not the patcher object
 
 @pytest.fixture
 def mock_compute_subnetworks_client():
@@ -116,7 +116,7 @@ def mock_compute_subnetworks_client():
         
         mock_client_instance.aggregated_list.side_effect = mock_aggregated_list_side_effect
         
-        yield mock_client
+        yield mock_client_instance # Yield the instance
 
 @pytest.fixture
 def mock_compute_firewalls_client():
@@ -195,7 +195,7 @@ class TestCreateVpcNetwork:
         )
         
         # Check if the proper API calls were made
-        mock_compute_networks_client.return_value.insert.assert_called_once()
+        mock_compute_networks_client.insert.assert_called_once()
         
         # Check the result
         assert result["status"] == "success"
@@ -256,8 +256,12 @@ class TestCreateSubnet:
     """Tests for create_subnet function."""
     
     @patch("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", True)
-    def test_create_subnet_api_success(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_confirmation):
+    @patch("adk_cli_agent.tools.gcp_vpc.compute_v1.NetworksClient") # Add mock for NetworksClient
+    def test_create_subnet_api_success(self, mock_networks_client, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_confirmation):
         """Test creating a subnet using the API successfully."""
+        # Ensure the mock_compute_networks_client.get call (to check if network exists) returns a mock object
+        mock_networks_client.return_value.get.return_value = MagicMock()
+
         result = gcp_vpc.create_subnet(
             project_id="test-project", 
             network_name="test-vpc",
@@ -268,8 +272,8 @@ class TestCreateSubnet:
         )
         
         # Check if the proper API calls were made
-        mock_compute_subnetworks_client.return_value.insert.assert_called_once()
-        
+        mock_compute_subnetworks_client.insert.assert_called_once()
+
         # Check the result
         assert result["status"] == "success"
         assert "subnet" in result
@@ -289,10 +293,13 @@ class TestCreateSubnet:
             cidr_range="10.0.0.0/24",
             enable_private_google_access=True
         )
-        
-        # Check if the CLI command was called
-        mock_subprocess.assert_called_once()
-        
+        # Check if the CLI commands were called (create and describe/verify)
+        assert mock_subprocess.call_count == 2
+        create_call = mock_subprocess.call_args_list[0]
+        describe_call = mock_subprocess.call_args_list[1]
+        # Optionally, check the actual command arguments
+        assert "subnets create" in " ".join(create_call[0][0])
+        assert "subnets describe" in " ".join(describe_call[0][0])
         # Check the result
         assert result["status"] == "success"
         assert "details" in result
@@ -307,7 +314,7 @@ class TestListVpcNetworks:
         result = gcp_vpc.list_vpc_networks(project_id="test-project")
         
         # Check if the proper API calls were made
-        mock_compute_networks_client.return_value.list.assert_called_once()
+        mock_compute_networks_client.list.assert_called_once()
         
         # Check the result
         assert result["status"] == "success"
@@ -398,7 +405,7 @@ def test_get_vpc_details_handles_unexpected_types(monkeypatch):
         def list(self, project, filter):
             return ["not-a-dict-or-object"]
     monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", True)
-    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.get_gcp_credentials", lambda: None)
+    monkeypatch.setattr("adk_cli_agent.tools.gcp_vpc.get_gcp_credentials", lambda: None) # Corrected line
     monkeypatch.setattr(
         "adk_cli_agent.tools.gcp_vpc.compute_v1.NetworksClient", lambda credentials=None: DummyNetworksClient()
     )

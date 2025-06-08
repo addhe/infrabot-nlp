@@ -68,6 +68,9 @@ def enable_private_google_access(
                 subnet_update = compute_v1.Subnetwork()
                 subnet_update.private_ip_google_access = True
                 
+                # Set the fingerprint to avoid 400 error
+                subnet_update.fingerprint = subnet.fingerprint
+                
                 # Use patch operation to update only the private_ip_google_access field
                 update_operation = subnet_client.patch(
                     project=project_id,
@@ -89,8 +92,9 @@ def enable_private_google_access(
                     }
                 }
             except Exception as api_error:
-                # Fall through to CLI approach silently
+                # Log the API error for debugging purposes
                 print(f"[DEBUG] API error: {str(api_error)}")
+                # Fall through to CLI approach
 
         # Fallback to gcloud CLI approach
         cmd = [
@@ -99,20 +103,30 @@ def enable_private_google_access(
             f"--region={region}",
             "--enable-private-ip-google-access"
         ]
+        
+        try:
 
-        # Run command
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            # Run command
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
-        return {
-            "status": "success",
-            "message": f"Successfully enabled private Google access for subnet '{subnet_name}' in region '{region}'.",
-            "subnet": {
-                "name": subnet_name,
-                "region": region,
-                "private_google_access": True
-            },
-            "details": result.stdout
-        }
+            return {
+                "status": "success",
+                "message": f"Successfully enabled private Google access for subnet '{subnet_name}' in region '{region}'.",
+                "subnet": {
+                    "name": subnet_name,
+                    "region": region,
+                    "private_google_access": True
+                },
+                "details": result.stdout
+            }
+        except subprocess.CalledProcessError as cli_e:
+            # If both API and CLI approach fail, return an error
+            error_details = cli_e.stderr if hasattr(cli_e, "stderr") else str(cli_e)
+            return {
+                "status": "error",
+                "message": f"Failed to enable private Google access: {error_details}",
+                "details": error_details
+            }
     except subprocess.CalledProcessError as e:
         error_details = e.stderr if hasattr(e, "stderr") else str(e)
         error_lower = error_details.lower() if error_details else ""
@@ -189,6 +203,9 @@ def disable_private_google_access(
                 # Create the patch request with private Google access disabled
                 subnet_update = compute_v1.Subnetwork()
                 subnet_update.private_ip_google_access = False
+                
+                # Set the fingerprint to avoid 400 error
+                subnet_update.fingerprint = subnet.fingerprint
 
                 # Use patch operation to update only the private_ip_google_access field
                 update_operation = subnet_client.patch(
@@ -211,8 +228,9 @@ def disable_private_google_access(
                     }
                 }
             except Exception as api_error:
-                # Fall through to CLI approach silently
-                pass
+                # Log the API error for debugging purposes
+                print(f"[DEBUG] API error: {str(api_error)}")
+                # Fall through to CLI approach
 
         # Fallback to gcloud CLI approach
         cmd = [
@@ -222,19 +240,28 @@ def disable_private_google_access(
             "--no-enable-private-ip-google-access"
         ]
 
-        # Run command
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        try:
+            # Run command
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
 
-        return {
-            "status": "success",
-            "message": f"Successfully disabled private Google access for subnet '{subnet_name}' in region '{region}'.",
-            "subnet": {
-                "name": subnet_name,
-                "region": region,
-                "private_google_access": False
-            },
-            "details": result.stdout
-        }
+            return {
+                "status": "success",
+                "message": f"Successfully disabled private Google access for subnet '{subnet_name}' in region '{region}'.",
+                "subnet": {
+                    "name": subnet_name,
+                    "region": region,
+                    "private_google_access": False
+                },
+                "details": result.stdout
+            }
+        except subprocess.CalledProcessError as cli_e:
+            # If both API and CLI approach fail, return an error
+            error_details = cli_e.stderr if hasattr(cli_e, "stderr") else str(cli_e)
+            return {
+                "status": "error",
+                "message": f"Failed to disable private Google access: {error_details}",
+                "details": error_details
+            }
     except subprocess.CalledProcessError as e:
         error_details = e.stderr if hasattr(e, "stderr") else str(e)
         error_lower = error_details.lower() if error_details else ""

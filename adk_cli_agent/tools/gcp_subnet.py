@@ -5,7 +5,8 @@ import subprocess
 from typing import Dict, Any
 from .confirmation_tools import confirm_action
 from .gcp_api_utils import get_gcp_credentials
-from .gcp_vpc import get_vpc_details
+from .gcp_vpc_utils import get_vpc_details
+
 
 # Check if GCP tools are available
 try:
@@ -34,6 +35,7 @@ def list_subnets(project_id: str, network_name: str) -> Dict[str, Any]:
             "details": "VPC network names typically end with '-vpc' and don't contain 'subnet'"
         }
         
+
     vpc_details = get_vpc_details(project_id, network_name)
     if vpc_details.get("status") != "success":
         return {

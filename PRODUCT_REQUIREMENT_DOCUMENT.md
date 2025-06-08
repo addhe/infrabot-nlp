@@ -60,13 +60,29 @@ The application must support the following tools, callable via AI understanding 
     *   **FR2.3.1**: List GCP projects. Users shall be able to list all projects or filter them by environment (e.g., dev, stg, prod) if such tagging/naming conventions are used or if "all" is specified as the environment. The status of each project (e.g., [ACTIVE], [DELETE_REQUESTED]) must be shown in the listing.
     *   **FR2.3.2**: Create new GCP projects, allowing specification of project ID, name, and organization ID.
     *   **FR2.3.3**: Delete GCP projects. If a project is not active or already scheduled for deletion, the user must receive a clear explanation.
-    *   **FR2.3.4**: VPC Management:
+    *   **FR2.3.4 VPC Management:**
         *   **FR2.3.4.1**: Create new VPC networks in GCP projects, allowing specification of network name, subnet mode (auto or custom), and routing mode (global or regional).
         *   **FR2.3.4.2**: Create custom subnets within VPCs, specifying region, CIDR range, and private Google access settings.
+            *   Support for any valid CIDR range (e.g., 10.0.0.0/24, 172.0.0.0/24)
+            *   User-friendly error messages for common issues like overlapping CIDR ranges
+            *   Fallback to CLI if API operations fail with appropriate error handling
         *   **FR2.3.4.3**: List existing VPC networks and their subnets in a specified project.
         *   **FR2.3.4.4**: Display detailed information about a specific VPC network, including its subnets, firewall rules, and peering connections.
         *   **FR2.3.4.5**: Delete a subnet from a VPC network, with user confirmation and robust error handling (including fallback to CLI if API fails).
         *   **FR2.3.4.6**: Enable or disable private Google access on existing subnets.
+            *   Proper handling of subnet fingerprint to ensure API operations succeed
+            *   Graceful fallback to CLI when API returns errors
+            *   Clear error messages for permission issues or resource not found errors
+
+        *   **FR2.3.4.7**: Delete all subnets in a VPC network and then delete the VPC itself, with user confirmation and robust error handling. The workflow must:
+            *   Prompt the user for confirmation before deleting all subnets and the VPC.
+            *   Optionally allow confirmation for each subnet deletion.
+            *   Abort the VPC deletion if any subnet deletion fails (unless cancelled by user).
+            *   Provide user-friendly error messages for common scenarios (e.g., VPC still in use, permission denied, resource not found)
+            *   Fallback to CLI if API operations fail
+
+        **VPC Deletion Workflow Note:**
+        When deleting a VPC network, the system will first attempt to delete all subnets within the VPC. Only after all subnets are successfully deleted will the VPC itself be deleted. The user will be prompted for confirmation before proceeding, and may be prompted for each subnet if desired. If any subnet cannot be deleted, the VPC deletion will be aborted and the user will be notified of the error(s). The system provides clear error messages for common scenarios like attempting to delete a VPC that is still in use by resources.
 
 ### 4.3. Configuration
 
@@ -88,10 +104,13 @@ The application must support the following tools, callable via AI understanding 
     *   Local tool execution (e.g., shell commands) should be near-instantaneous.
 *   **NFR1.2 Reliability**:
     *   The application should handle API errors gracefully (e.g., network issues, invalid API keys) and provide informative messages to the user.
+    *   The application should attempt to fall back to alternative methods (e.g., CLI commands) when API operations fail.
+    *   All operations must include comprehensive error handling with user-friendly error messages.
     *   The application should be stable and not crash unexpectedly.
 *   **NFR1.3 Usability**:
     *   The CLI should be intuitive and easy to learn.
-    *   Error messages should be clear and actionable.
+    *   Error messages should be clear, actionable, and specific to the operation being performed.
+    *   User feedback should be provided for long-running operations.
     *   Documentation (`README.md`, etc.) should be comprehensive.
 *   **NFR1.4 Security**:
     *   API keys must be handled securely, not hardcoded, and primarily managed through environment variables or git-ignored `.env` files.
@@ -124,3 +143,31 @@ The application must support the following tools, callable via AI understanding 
     *   Cloud NAT setup for private instances
     *   Shared VPC configuration across projects
     *   VPC Service Controls integration for security boundaries
+
+## 7. Implementation Status and Recent Improvements
+
+As of June 2025, the following key improvements have been implemented:
+
+### 7.1 GCP VPC Management Enhancements
+
+*   **Improved Error Handling**: 
+    *   Comprehensive error detection and user-friendly messages across all VPC and subnet operations
+    *   Specific error handling for common scenarios (e.g., resources in use, permission denied, invalid CIDR ranges)
+    *   Structured try/except blocks for both API and CLI approaches
+
+*   **Fixed API Operations**:
+    *   Added proper fingerprint handling for subnet updates to resolve the "Required field 'resource.fingerprint' not specified" error
+    *   Ensured proper fallback from API to CLI when API operations fail
+    *   Enhanced verification of operation results
+
+*   **User Experience Improvements**:
+    *   More informative error messages that explain what went wrong and suggest solutions
+    *   Better handling of edge cases like overlapping CIDR ranges or resources in use
+    *   Improved validation and confirmation workflows
+
+*   **Code Structure Improvements**:
+    *   Resolved circular import issues by moving utility functions to appropriate modules
+    *   Enhanced test coverage and fixed test failures
+    *   Better modularization of functionality
+
+These improvements aim to provide a more robust, reliable, and user-friendly experience when working with GCP VPC resources melalui CLI Infrabot-NLP.

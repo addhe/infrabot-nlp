@@ -29,7 +29,7 @@ class TestDeleteVpcNetwork:
         mock_operation = MagicMock()
         mock_result = MagicMock()
         mock_operation.result.return_value = mock_result
-        mock_compute_networks_client.return_value.delete.return_value = mock_operation
+        mock_compute_networks_client.delete.return_value = mock_operation
         
         # Mock the get_vpc_details function to return a successful result
         with patch("adk_cli_agent.tools.gcp_vpc.get_vpc_details") as mock_get_details:
@@ -47,7 +47,7 @@ class TestDeleteVpcNetwork:
             )
             
             # Check if the proper API calls were made
-            mock_compute_networks_client.return_value.delete.assert_called_once()
+            mock_compute_networks_client.delete.assert_called_once()
             
             # Check the result
             assert result["status"] == "success"

@@ -8,15 +8,16 @@ import os
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../../')))
 
-# Import the functions we're testing
+# Import the functions we\'re testing
 from adk_cli_agent.tools.gcp_vpc import (
     create_vpc_network,
     create_subnet,
     list_vpc_networks,
-    get_vpc_details,
+    # get_vpc_details, # Removed: Now imported from gcp_vpc_utils
     HAS_GCP_TOOLS_FLAG,
     compute_v1
 )
+from adk_cli_agent.tools.gcp_vpc_utils import get_vpc_details # Added: Import from utils
 
 # Test data
 TEST_VPC_NETWORKS = [
@@ -45,140 +46,195 @@ TEST_VPC_NETWORKS = [
 
 @pytest.fixture
 def mock_get_gcp_credentials():
-    """Mock the get_gcp_credentials function."""
-    with patch("adk_cli_agent.tools.gcp_vpc.get_gcp_credentials") as mock:
-        mock.return_value = MagicMock()
-        yield mock
+    """Mock the get_gcp_credentials function in both relevant modules."""
+    shared_mock_credentials = MagicMock()
+    with patch("adk_cli_agent.tools.gcp_vpc.get_gcp_credentials", return_value=shared_mock_credentials), \
+         patch("adk_cli_agent.tools.gcp_vpc_utils.get_gcp_credentials", return_value=shared_mock_credentials):
+        yield shared_mock_credentials
 
 @pytest.fixture
 def mock_compute_networks_client():
-    """Mock GCP Compute Networks Client."""
-    with patch("adk_cli_agent.tools.gcp_vpc.compute_v1.NetworksClient", create=True) as mock_client:
-        # Create a proper client instance that can be used
-        mock_client_instance = MagicMock()
-        mock_client.return_value = mock_client_instance
-        
-        # Mock the insert operation
-        mock_operation = MagicMock()
-        mock_result = MagicMock()
-        mock_result.id = "1234567890"
-        mock_operation.result.return_value = mock_result
-        mock_client_instance.insert.return_value = mock_operation
-        
-        # Mock the list operation
-        mock_network1 = MagicMock()
-        mock_network1.name = "test-vpc-1"
-        mock_network1.id = "1234567890"
-        mock_network1.auto_create_subnetworks = True
-        mock_network1.routing_config = MagicMock()
-        mock_network1.routing_config.routing_mode = MagicMock()
-        mock_network1.routing_config.routing_mode.name = "GLOBAL"
-        
-        mock_network2 = MagicMock()
-        mock_network2.name = "test-vpc-2"
-        mock_network2.id = "0987654321"
-        mock_network2.auto_create_subnetworks = False
-        mock_network2.routing_config = MagicMock()
-        mock_network2.routing_config.routing_mode = MagicMock()
-        mock_network2.routing_config.routing_mode.name = "REGIONAL"
-        
-        mock_client_instance.list.return_value = [mock_network1, mock_network2]
-        
-        # Mock the get operation
-        mock_client_instance.get.return_value = mock_network1
-        
-        yield mock_client
+    """Mock GCP Compute Networks Client in both relevant modules."""
+    mock_client_instance = MagicMock()
+    
+    # Configure common behavior for mock_client_instance (insert, list, get methods)
+    mock_operation = MagicMock()
+    mock_result_op = MagicMock() # Renamed to avoid conflict with subprocess mock's 'result'
+    mock_result_op.id = "1234567890"
+    mock_operation.result.return_value = mock_result_op
+    mock_client_instance.insert.return_value = mock_operation
+    
+    mock_network1 = MagicMock()
+    mock_network1.name = "test-vpc-1"
+    mock_network1.id = "1234567890"
+    mock_network1.auto_create_subnetworks = True
+    mock_network1.routing_config = MagicMock()
+    mock_network1.routing_config.routing_mode = MagicMock()
+    mock_network1.routing_config.routing_mode.name = "GLOBAL"
+    
+    mock_network2 = MagicMock()
+    mock_network2.name = "test-vpc-2"
+    mock_network2.id = "0987654321"
+    mock_network2.auto_create_subnetworks = False
+    mock_network2.routing_config = MagicMock()
+    mock_network2.routing_config.routing_mode = MagicMock()
+    mock_network2.routing_config.routing_mode.name = "REGIONAL"
+    
+    mock_client_instance.list.return_value = [mock_network1, mock_network2]
+    mock_client_instance.get.return_value = mock_network1 # Default mock for get
+
+    with patch("adk_cli_agent.tools.gcp_vpc.compute_v1.NetworksClient", create=True, return_value=mock_client_instance), \
+         patch("adk_cli_agent.tools.gcp_vpc_utils.compute_v1.NetworksClient", create=True, return_value=mock_client_instance):
+        yield mock_client_instance
 
 @pytest.fixture
 def mock_compute_subnetworks_client():
-    """Mock GCP Compute Subnetworks Client."""
-    with patch("adk_cli_agent.tools.gcp_vpc.compute_v1.SubnetworksClient", create=True) as mock_client:
-        # Create a proper client instance that can be used
-        mock_client_instance = MagicMock()
-        mock_client.return_value = mock_client_instance
-        
-        # Mock the insert operation
-        mock_operation = MagicMock()
-        mock_result = MagicMock()
-        mock_result.id = "subnet-1234567890"
-        mock_operation.result.return_value = mock_result
-        mock_client_instance.insert.return_value = mock_operation
-        
-        # Mock the aggregated_list operation
-        mock_subnet = MagicMock()
-        mock_subnet.name = "test-subnet-1"
-        mock_subnet.ip_cidr_range = "10.0.0.0/24"
-        mock_subnet.private_ip_google_access = True
-        mock_subnet.secondary_ip_ranges = []
-        
-        mock_subnet_list = MagicMock()
-        mock_subnet_list.subnetworks = [mock_subnet]
-        
-        mock_items = {
-            "regions/us-central1": mock_subnet_list,
-            "regions/us-east1": MagicMock(subnetworks=[])
-        }
-        
-        def mock_aggregated_list_side_effect(**kwargs):
-            return mock_items.items()
-        
-        mock_client_instance.aggregated_list.side_effect = mock_aggregated_list_side_effect
-        
-        yield mock_client
+    """Mock GCP Compute Subnetworks Client in both relevant modules."""
+    mock_client_instance = MagicMock()
+
+    mock_operation = MagicMock()
+    mock_result_op = MagicMock()
+    mock_result_op.id = "subnet-1234567890"
+    mock_operation.result.return_value = mock_result_op
+    mock_client_instance.insert.return_value = mock_operation
+    
+    mock_subnet = MagicMock()
+    mock_subnet.name = "test-subnet-1"
+    mock_subnet.ip_cidr_range = "10.0.0.0/24"
+    mock_subnet.private_ip_google_access = True
+    mock_subnet.secondary_ip_ranges = []
+    
+    mock_subnet_list = MagicMock()
+    mock_subnet_list.subnetworks = [mock_subnet]
+    
+    mock_items = {
+        "regions/us-central1": mock_subnet_list,
+        "regions/us-east1": MagicMock(subnetworks=[])
+    }
+    
+    def mock_aggregated_list_side_effect(**kwargs):
+        return mock_items.items()
+    
+    mock_client_instance.aggregated_list.side_effect = mock_aggregated_list_side_effect
+
+    with patch("adk_cli_agent.tools.gcp_vpc.compute_v1.SubnetworksClient", create=True, return_value=mock_client_instance), \
+         patch("adk_cli_agent.tools.gcp_vpc_utils.compute_v1.SubnetworksClient", create=True, return_value=mock_client_instance):
+        yield mock_client_instance
 
 @pytest.fixture
 def mock_compute_firewalls_client():
-    """Mock GCP Compute Firewalls Client."""
-    with patch("adk_cli_agent.tools.gcp_vpc.compute_v1.FirewallsClient", create=True) as mock_client:
-        # Create a proper client instance that can be used
-        mock_client_instance = MagicMock()
-        mock_client.return_value = mock_client_instance
-        
-        # Mock the list operation
-        mock_firewall_rule = MagicMock()
-        mock_firewall_rule.name = "allow-internal"
-        mock_firewall_rule.description = "Allow internal traffic"
-        mock_firewall_rule.direction = "INGRESS"
-        mock_firewall_rule.priority = 1000
-        
-        mock_allowed = MagicMock()
-        mock_allowed.protocol = "tcp"
-        mock_allowed.ports = ["22", "80"]
-        mock_firewall_rule.allowed = [mock_allowed]
-        mock_firewall_rule.denied = []
-        mock_firewall_rule.source_ranges = ["10.0.0.0/8"]
-        mock_firewall_rule.target_tags = ["web"]
-        
-        mock_client_instance.list.return_value = [mock_firewall_rule]
-        
-        yield mock_client
+    """Mock GCP Compute Firewalls Client in both relevant modules."""
+    mock_client_instance = MagicMock()
+    
+    mock_firewall_rule = MagicMock()
+    mock_firewall_rule.name = "allow-internal"
+    mock_firewall_rule.description = "Allow internal traffic"
+    mock_firewall_rule.direction = "INGRESS"
+    mock_firewall_rule.priority = 1000
+    
+    mock_allowed = MagicMock()
+    mock_allowed.protocol = "tcp"
+    mock_allowed.ports = ["22", "80"]
+    mock_firewall_rule.allowed = [mock_allowed]
+    mock_firewall_rule.denied = []
+    mock_firewall_rule.source_ranges = ["10.0.0.0/8"]
+    mock_firewall_rule.target_tags = ["web"]
+    
+    mock_client_instance.list.return_value = [mock_firewall_rule]
+
+    with patch("adk_cli_agent.tools.gcp_vpc.compute_v1.FirewallsClient", create=True, return_value=mock_client_instance), \
+         patch("adk_cli_agent.tools.gcp_vpc_utils.compute_v1.FirewallsClient", create=True, return_value=mock_client_instance):
+        yield mock_client_instance
 
 @pytest.fixture
-def mock_confirmation(monkeypatch):
+def mock_confirmation():  # Removed monkeypatch argument
     """Mock confirmation to always return True."""
-    with patch("adk_cli_agent.tools.gcp_vpc.confirm_action", return_value=True):
-        yield
+    # confirm_action is in gcp_vpc.py and gcp_subnet.py (via confirmation_tools.py)
+    # Patching where it\'s directly imported by the modules under test or their direct imports.
+    with patch("adk_cli_agent.tools.gcp_vpc.confirm_action", return_value=True) as mock_confirm_vpc, \
+         patch("adk_cli_agent.tools.confirmation_tools.confirm_action", return_value=True) as mock_confirm_tools, \
+         patch("adk_cli_agent.tools.gcp_subnet.confirm_action", return_value=True, create=True) as mock_confirm_subnet:
+        # Yield the one most likely to be used by gcp_vpc.py functions, or a generic mock if shared.
+        yield mock_confirm_vpc 
 
 @pytest.fixture
 def mock_subprocess():
     """Mock subprocess for CLI commands."""
-    with patch("subprocess.run") as mock:
-        mock_result = MagicMock()
-        mock_result.stdout = json.dumps(TEST_VPC_NETWORKS)
-        mock_result.returncode = 0
+    with patch("subprocess.run") as mock_run:
+        # Mock for 'gcloud compute networks subnets create'
+        mock_subnet_create_result = MagicMock()
+        mock_subnet_create_result.stdout = "" 
+        mock_subnet_create_result.stderr = ""
+        mock_subnet_create_result.returncode = 0
+
+        # Mock for 'gcloud compute networks subnets describe'
+        mock_subnet_describe_output = {
+            "name": "test-subnet", 
+            "network": "projects/test-project/global/networks/test-vpc", 
+            "ipCidrRange": "10.0.0.0/24", 
+            "region": "projects/test-project/regions/us-central1", 
+            "privateIpGoogleAccess": True, 
+            "secondaryIpRanges": [] 
+        }
+        mock_subnet_describe_result = MagicMock()
+        mock_subnet_describe_result.stdout = json.dumps(mock_subnet_describe_output)
+        mock_subnet_describe_result.stderr = ""
+        mock_subnet_describe_result.returncode = 0
+
+        # Mock for 'gcloud compute networks list' (for list_vpc_networks test)
+        mock_networks_list_result = MagicMock()
+        mock_networks_list_result.stdout = json.dumps(TEST_VPC_NETWORKS)
+        mock_networks_list_result.stderr = ""
+        mock_networks_list_result.returncode = 0
         
-        # Configure mock to return different results for different commands
-        def side_effect(*args, **kwargs):
-            cmd = args[0] if args else kwargs.get("args", [])
-            if isinstance(cmd, list) and any("describe" in str(c) for c in cmd):
-                network_result = MagicMock()
-                network_result.stdout = json.dumps(TEST_VPC_NETWORKS[0])
-                network_result.returncode = 0
-                return network_result
-            return mock_result
-            
-        mock.side_effect = side_effect
-        yield mock
+        # Mock for 'gcloud compute networks describe' (for get_vpc_details test - network details)
+        mock_network_describe_output = TEST_VPC_NETWORKS[0] #  VPC details
+        mock_network_describe_cli_result = MagicMock()
+        mock_network_describe_cli_result.stdout = json.dumps(mock_network_describe_output)
+        mock_network_describe_cli_result.stderr = ""
+        mock_network_describe_cli_result.returncode = 0
+
+        # Mock for 'gcloud compute networks subnets list --network' (for get_vpc_details test - subnets list)
+        mock_subnets_list_output = [{"name": "subnet-1", "ipCidrRange": "10.1.0.0/24", "region": "us-central1"}]
+        mock_subnets_list_cli_result = MagicMock()
+        mock_subnets_list_cli_result.stdout = json.dumps(mock_subnets_list_output)
+        mock_subnets_list_cli_result.stderr = ""
+        mock_subnets_list_cli_result.returncode = 0
+        
+        # Mock for 'gcloud compute firewall-rules list --filter' (for get_vpc_details test - firewall rules)
+        mock_firewalls_list_output = [{"name": "fw-rule-1", "direction": "INGRESS", "priority": 1000}]
+        mock_firewalls_list_cli_result = MagicMock()
+        mock_firewalls_list_cli_result.stdout = json.dumps(mock_firewalls_list_output)
+        mock_firewalls_list_cli_result.stderr = ""
+        mock_firewalls_list_cli_result.returncode = 0
+
+        def side_effect_func(cmd_args_list, **kwargs):
+            cmd_str = " ".join(cmd_args_list)
+
+            # More specific matches first
+            if "compute networks subnets describe" in cmd_str:
+                return mock_subnet_describe_result
+            elif "compute networks subnets create" in cmd_str:
+                return mock_subnet_create_result
+            # Order changed: Specific get_vpc_details calls before general list_vpc_networks
+            elif "compute networks subnets list" in cmd_str and "--network" in cmd_str: # for get_vpc_details (subnets)
+                 return mock_subnets_list_cli_result
+            elif "compute firewall-rules list" in cmd_str and "--filter=network:" in cmd_str: # for get_vpc_details (firewalls)
+                 return mock_firewalls_list_cli_result
+            elif "compute networks describe" in cmd_str: # for get_vpc_details (network details)
+                 return mock_network_describe_cli_result
+            # General list for list_vpc_networks (less specific)
+            elif "compute networks list" in cmd_str: # for list_vpc_networks
+                return mock_networks_list_result
+            else: 
+                default_mock_result = MagicMock()
+                default_mock_result.stdout = "{}" 
+                default_mock_result.stderr = f"Command not specifically mocked: {cmd_str}"
+                default_mock_result.returncode = 0 
+                return default_mock_result
+
+        mock_run.side_effect = side_effect_func
+        yield mock_run
 
 class TestCreateVpcNetwork:
     """Tests for create_vpc_network function."""
@@ -192,7 +248,7 @@ class TestCreateVpcNetwork:
         mock_routing_config,    # for NetworkRoutingConfig
         mock_get_gcp_credentials,
         mock_compute_networks_client,
-        mock_confirmation
+        mock_confirmation # mock_confirmation is a fixture
     ):
         """Test creating a VPC network using the API successfully."""
         result = create_vpc_network(
@@ -203,7 +259,7 @@ class TestCreateVpcNetwork:
         )
         
         # Check if the proper API calls were made
-        mock_compute_networks_client.return_value.insert.assert_called_once()
+        mock_compute_networks_client.insert.assert_called_once() # Corrected: remove .return_value
         
         # Check the result
         assert result["status"] == "success"
@@ -264,8 +320,12 @@ class TestCreateSubnet:
     """Tests for create_subnet function."""
     
     @patch("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", True)
-    def test_create_subnet_api_success(self, mock_get_gcp_credentials, mock_compute_subnetworks_client, mock_confirmation):
+    # mock_compute_networks_client is a fixture providing the client instance
+    def test_create_subnet_api_success(self, mock_get_gcp_credentials, mock_compute_networks_client, mock_compute_subnetworks_client, mock_confirmation): # mock_confirmation is a fixture
         """Test creating a subnet using the API successfully."""
+        # Ensure the mock_compute_networks_client.get call (to check if network exists) returns a mock object
+        mock_compute_networks_client.get.return_value = MagicMock() 
+
         result = create_subnet(
             project_id="test-project", 
             network_name="test-vpc",
@@ -275,35 +335,77 @@ class TestCreateSubnet:
             enable_private_google_access=True
         )
         
-        # Check if the proper API calls were made
-        mock_compute_subnetworks_client.return_value.insert.assert_called_once()
+        mock_compute_subnetworks_client.insert.assert_called_once()
         
-        # Check the result
         assert result["status"] == "success"
         assert "subnet" in result
         assert result["subnet"]["name"] == "test-subnet"
         assert result["subnet"]["region"] == "us-central1"
         assert result["subnet"]["cidr_range"] == "10.0.0.0/24"
         assert result["subnet"]["private_google_access"] is True
-    
+
     @patch("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", False)
     def test_create_subnet_cli_success(self, mock_subprocess, mock_confirmation):
         """Test creating a subnet using the CLI successfully."""
+        project_id="test-project"
+        network_name="test-vpc"
+        subnet_name="test-subnet"
+        region="us-central1"
+        cidr_range="10.0.0.0/24"
+        enable_private_google_access=True
+
         result = create_subnet(
-            project_id="test-project", 
-            network_name="test-vpc",
-            subnet_name="test-subnet",
-            region="us-central1",
-            cidr_range="10.0.0.0/24",
-            enable_private_google_access=True
+            project_id=project_id, 
+            network_name=network_name,
+            subnet_name=subnet_name,
+            region=region,
+            cidr_range=cidr_range,
+            enable_private_google_access=enable_private_google_access
         )
         
-        # Check if the CLI command was called
-        mock_subprocess.assert_called_once()
+        assert mock_subprocess.call_count == 2 
         
-        # Check the result
+        # Call 1: Create subnet
+        create_call_args_tuple = mock_subprocess.call_args_list[0]
+        create_cmd_list = create_call_args_tuple[0][0] # The command list as a list of strings
+
+        assert "gcloud" in create_cmd_list
+        assert "compute" in create_cmd_list
+        assert "networks" in create_cmd_list
+        assert "subnets" in create_cmd_list
+        assert "create" in create_cmd_list
+        assert subnet_name in create_cmd_list
+        assert f"--network={network_name}" in create_cmd_list
+        assert f"--project={project_id}" in create_cmd_list
+        assert f"--range={cidr_range}" in create_cmd_list
+        assert f"--region={region}" in create_cmd_list
+        if enable_private_google_access:
+            # Corrected assertion: The actual flag used in gcp_vpc.py is "--enable-private-ip"
+            assert "--enable-private-ip" in create_cmd_list
+        else:
+            assert "--no-enable-private-ip" in create_cmd_list # Or check it's absent
+
+        # Call 2: Describe subnet
+        describe_call_args_tuple = mock_subprocess.call_args_list[1]
+        describe_cmd_list = describe_call_args_tuple[0][0] # The command list
+
+        assert "gcloud" in describe_cmd_list
+        assert "compute" in describe_cmd_list
+        assert "networks" in describe_cmd_list
+        assert "subnets" in describe_cmd_list
+        assert "describe" in describe_cmd_list
+        assert subnet_name in describe_cmd_list
+        assert f"--project={project_id}" in describe_cmd_list
+        assert f"--region={region}" in describe_cmd_list
+        assert "--format=json" in describe_cmd_list
+
         assert result["status"] == "success"
         assert "details" in result
+        # Optionally, verify the contents of result["details"] based on mock_subnet_describe_output
+        details_dict = json.loads(result["details"]) if isinstance(result["details"], str) else result["details"]
+        assert details_dict["name"] == subnet_name
+        assert details_dict["ipCidrRange"] == cidr_range
+        assert details_dict["privateIpGoogleAccess"] == enable_private_google_access
 
 
 class TestListVpcNetworks:
@@ -315,7 +417,7 @@ class TestListVpcNetworks:
         result = list_vpc_networks(project_id="test-project")
         
         # Check if the proper API calls were made
-        mock_compute_networks_client.return_value.list.assert_called_once()
+        mock_compute_networks_client.list.assert_called_once() # Corrected: remove .return_value
         
         # Check the result
         assert result["status"] == "success"
@@ -345,33 +447,63 @@ class TestGetVpcDetails:
     @patch("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", True)
     def test_get_vpc_details_api_success(self, mock_get_gcp_credentials, mock_compute_networks_client, mock_compute_subnetworks_client, mock_compute_firewalls_client):
         """Test getting VPC details using the API successfully."""
-        result = get_vpc_details(
-            project_id="test-project", 
-            network_name="test-vpc-1"
-        )
+        # Since get_vpc_details is in gcp_vpc_utils.py, HAS_GCP_TOOLS_FLAG for it should be patched there.
+        # However, the mock_compute_networks_client fixture already patches the client in both utils and gcp_vpc.
+        # The HAS_GCP_TOOLS_FLAG patch here might be misleading if not correctly targeted.
+        # For now, let's assume the test setup intends to control behavior via the flag in gcp_vpc.py,
+        # but the actual function under test is get_vpc_details from gcp_vpc_utils.py.
+        # This might need refinement if get_vpc_details itself checks a flag in its own module.
+
+        with patch("adk_cli_agent.tools.gcp_vpc_utils.HAS_GCP_TOOLS_FLAG", True): # More specific patch
+            result = get_vpc_details(
+                project_id="test-project", 
+                network_name="test-vpc-1"
+            )
         
         # Check if the proper API calls were made
-        mock_compute_networks_client.return_value.get.assert_called_once()
+        mock_compute_networks_client.get.assert_called_once() # Corrected: remove .return_value
         
         # Check the result
         assert result["status"] == "success"
         assert "network" in result
         assert result["network"]["name"] == "test-vpc-1"
     
-    @patch("adk_cli_agent.tools.gcp_vpc.HAS_GCP_TOOLS_FLAG", False)
+    @patch("adk_cli_agent.tools.gcp_vpc_utils.HAS_GCP_TOOLS_FLAG", False) # Corrected patch target
     def test_get_vpc_details_cli_success(self, mock_subprocess):
         """Test getting VPC details using the CLI successfully."""
+        project_id = "test-project"
+        network_name = "test-vpc-1" # Should match the network name in mock_network_describe_output
+
         result = get_vpc_details(
-            project_id="test-project", 
-            network_name="test-vpc-1"
+            project_id=project_id, 
+            network_name=network_name
         )
         
-        # Check if the CLI command was called
-        assert mock_subprocess.call_count >= 1
+        assert mock_subprocess.call_count == 3
+
+        expected_calls = [
+            (['gcloud', 'compute', 'networks', 'describe', network_name, f'--project={project_id}', '--format=json'], 
+             {'capture_output': True, 'text': True, 'check': True}),
+            (['gcloud', 'compute', 'networks', 'subnets', 'list', f'--project={project_id}', f'--network={network_name}', '--format=json'], # Swapped order of --project and --network
+             {'capture_output': True, 'text': True, 'check': True}),
+            (['gcloud', 'compute', 'firewall-rules', 'list', f'--project={project_id}', f'--filter=network:{network_name}', '--format=json'], # Swapped order of --project and --filter
+             {'capture_output': True, 'text': True, 'check': True})
+        ]
         
-        # Check the result
+        # Check each call
+        for i, expected_call in enumerate(expected_calls):
+            actual_call_args, actual_call_kwargs = mock_subprocess.call_args_list[i]
+            assert actual_call_args[0] == expected_call[0] # Compare command list
+            assert actual_call_kwargs == expected_call[1] # Compare kwargs
+        
         assert result["status"] == "success"
         assert "network" in result
+        assert result["network"]["name"] == network_name 
+        # Add more assertions based on the combined mocked output if necessary
+        assert "subnets" in result["network"]
+        assert len(result["network"]["subnets"]) > 0 # Based on mock_subnets_list_output
+        assert "firewall_rules" in result["network"]
+        assert len(result["network"]["firewall_rules"]) > 0 # Based on mock_firewalls_list_output
 
 def test_list_vpc_networks_handles_str_type(monkeypatch):
     class DummyNetworksClient:
