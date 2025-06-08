@@ -122,9 +122,17 @@ def enable_private_google_access(
         except subprocess.CalledProcessError as cli_e:
             # If both API and CLI approach fail, return an error
             error_details = cli_e.stderr if hasattr(cli_e, "stderr") else str(cli_e)
+            error_lower = error_details.lower() if error_details else ""
+            
+            # Handle error cases for CLI execution
+            if "timeout" in error_lower or "connection" in error_lower or "unavailable" in error_lower:
+                message = f"Network or API error when enabling private Google access: {error_details}"
+            else:
+                message = f"Error enabling private Google access: {error_details}"
+                
             return {
                 "status": "error",
-                "message": f"Failed to enable private Google access: {error_details}",
+                "message": message,
                 "details": error_details
             }
     except subprocess.CalledProcessError as e:
@@ -257,9 +265,17 @@ def disable_private_google_access(
         except subprocess.CalledProcessError as cli_e:
             # If both API and CLI approach fail, return an error
             error_details = cli_e.stderr if hasattr(cli_e, "stderr") else str(cli_e)
+            error_lower = error_details.lower() if error_details else ""
+            
+            # Handle error cases for CLI execution
+            if "timeout" in error_lower or "connection" in error_lower or "unavailable" in error_lower:
+                message = f"Network or API error when disabling private Google access: {error_details}"
+            else:
+                message = f"Error disabling private Google access: {error_details}"
+                
             return {
                 "status": "error",
-                "message": f"Failed to disable private Google access: {error_details}",
+                "message": message,
                 "details": error_details
             }
     except subprocess.CalledProcessError as e:
