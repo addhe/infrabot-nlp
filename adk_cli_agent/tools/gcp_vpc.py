@@ -352,22 +352,49 @@ def create_subnet(
                         "details": str(api_e)
                     }
 
-            # Wait for operation to complete
-            # This will throw an exception if the operation fails
-            result = operation.result()
-            
-            # If we get here, the operation was successful
-            return {
-                "status": "success",
-                "message": f"Subnet '{subnet_name}' created successfully in network '{network_name}' (region: {region})",
-                "subnet": {
-                    "name": subnet_name,
-                    "id": result.id,
-                    "region": region,
-                    "cidr_range": cidr_range,
-                    "private_google_access": enable_private_google_access
+            try:
+                # Wait for operation to complete
+                # This will throw an exception if the operation fails
+                result = operation.result()
+                
+                # If we get here, the operation was successful
+                return {
+                    "status": "success",
+                    "message": f"Subnet '{subnet_name}' created successfully in network '{network_name}' (region: {region})",
+                    "subnet": {
+                        "name": subnet_name,
+                        "id": result.id,
+                        "region": region,
+                        "cidr_range": cidr_range,
+                        "private_google_access": enable_private_google_access
+                    }
                 }
-            }
+            except Exception as op_error:
+                # Before returning an error, verify if the subnet was actually created despite the error
+                try:
+                    # Check if subnet actually exists before returning error
+                    verification_subnet = subnet_client.get(
+                        project=project_id,
+                        region=region,
+                        subnetwork=subnet_name
+                    )
+                    
+                    # If we get here, the subnet exists, meaning it was created successfully despite the error
+                    print(f"[DEBUG] Subnet operation reported error but subnet exists: {op_error}")
+                    return {
+                        "status": "success",
+                        "message": f"Subnet '{subnet_name}' created successfully in network '{network_name}' (region: {region})",
+                        "subnet": {
+                            "name": subnet_name,
+                            "region": region,
+                            "cidr_range": cidr_range,
+                            "private_google_access": enable_private_google_access
+                        },
+                        "warning": "API reported an error but the subnet was created successfully"
+                    }
+                except Exception:
+                    # Subnet verification also failed, so it's likely a real error
+                    raise op_error
         else:
             # Fallback to gcloud CLI if API libraries aren't available
             private_access_arg = "--enable-private-ip"
@@ -472,6 +499,64 @@ def create_subnet(
         # Debug logging for troubleshooting
         print(f"[DEBUG] Subnet creation general error: {error_details}")
         
+        # Before returning an error, check if the subnet actually exists (might have been created despite error)
+        try:
+            if HAS_GCP_TOOLS_FLAG:
+                # Try to verify if the subnet actually exists using API
+                try:
+                    credentials = get_gcp_credentials()
+                    subnet_client = compute_v1.SubnetworksClient(credentials=credentials)
+                    verification_subnet = subnet_client.get(
+                        project=project_id, 
+                        region=region,
+                        subnetwork=subnet_name
+                    )
+                    
+                    # If we get here, the subnet exists, so it was created successfully
+                    print(f"[DEBUG] Subnet exists despite error: {error_details}")
+                    return {
+                        "status": "success",
+                        "message": f"Subnet '{subnet_name}' created successfully in network '{network_name}' (region: {region})",
+                        "subnet": {
+                            "name": subnet_name,
+                            "region": region,
+                            "cidr_range": cidr_range,
+                            "private_google_access": enable_private_google_access
+                        },
+                        "warning": "Operation reported an error but the subnet was created successfully"
+                    }
+                except Exception as verify_error:
+                    # Verification failed - continue to error handling
+                    print(f"[DEBUG] Subnet verification failed: {verify_error}")
+            
+            # Fallback to CLI verification if API check failed
+            try:
+                verify_cmd = [
+                    "gcloud", "compute", "networks", "subnets", "describe", subnet_name,
+                    f"--project={project_id}", f"--region={region}", "--format=json"
+                ]
+                verify_result = subprocess.run(verify_cmd, capture_output=True, text=True, check=True)
+                
+                # If we reach here without exception, the subnet exists
+                print(f"[DEBUG] Subnet exists despite error (CLI verification): {error_details}")
+                return {
+                    "status": "success",
+                    "message": f"Subnet '{subnet_name}' created successfully in network '{network_name}' (region: {region})",
+                    "subnet": {
+                        "name": subnet_name,
+                        "region": region,
+                        "cidr_range": cidr_range,
+                        "private_google_access": enable_private_google_access
+                    },
+                    "warning": "Operation reported an error but the subnet was created successfully"
+                }
+            except Exception:
+                # Both verification methods failed, so it's likely a real error
+                pass
+        except Exception:
+            # Failed to verify subnet existence, continue with error handling
+            pass
+            
         # Handle known error cases with improved messages
         if "already exists" in error_lower:
             message = f"Subnet '{subnet_name}' already exists in region '{region}'."
