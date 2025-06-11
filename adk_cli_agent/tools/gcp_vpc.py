@@ -314,11 +314,31 @@ def create_subnet(
                 subnet.private_ip_google_access = enable_private_google_access
                 
                 # Create subnet using the API
-                operation = subnet_client.insert(
-                    project=project_id,
-                    region=region,
-                    subnetwork_resource=subnet
-                )
+                try:
+                    operation = subnet_client.insert(
+                        project=project_id,
+                        region=region,
+                        subnetwork_resource=subnet
+                    )
+                except Exception as insert_e:
+                    error_msg = str(insert_e)
+                    print(f"[DEBUG] API insert error: {error_msg}")
+                    
+                    # Handle specific errors with clear messages
+                    if "overlap" in error_msg.lower():
+                        return {
+                            "status": "error",
+                            "message": f"The CIDR range '{cidr_range}' overlaps with an existing subnet in VPC '{network_name}'. Please choose a different CIDR range.",
+                            "details": error_msg
+                        }
+                    elif "invalid" in error_msg.lower() and "cidr" in error_msg.lower():
+                        return {
+                            "status": "error",
+                            "message": f"Invalid CIDR range '{cidr_range}'. Please provide a valid CIDR range (e.g., 10.0.0.0/24).",
+                            "details": error_msg
+                        }
+                    else:
+                        raise insert_e  # Re-raise for the outer exception handler
             except Exception as api_e:
                 # Fall through to CLI approach silently if there's an API-specific error
                 if 'API not enabled' in str(api_e) or 'requires billing to be enabled' in str(api_e):
@@ -421,7 +441,10 @@ def create_subnet(
         error_details = e.stderr if hasattr(e, "stderr") else str(e)
         error_lower = error_details.lower() if error_details else ""
         
-        # Handle known error cases
+        # Debug logging to help troubleshoot
+        print(f"[DEBUG] Subnet creation CLI error: {error_details}")
+        
+        # Handle known error cases with more detailed messages
         if "already exists" in error_lower:
             message = f"Subnet '{subnet_name}' already exists in region '{region}'."
         elif "permission denied" in error_lower or "permissions" in error_lower:
@@ -429,11 +452,13 @@ def create_subnet(
         elif "invalid cidr range" in error_lower or "invalid value for" in error_lower and "range" in error_lower:
             message = f"Invalid CIDR range '{cidr_range}'. Please specify a valid CIDR range (e.g., 10.0.0.0/24)."
         elif "overlap" in error_lower:
-            message = f"CIDR range '{cidr_range}' overlaps with an existing subnet in network '{network_name}'."
+            message = f"CIDR range '{cidr_range}' overlaps with an existing subnet in network '{network_name}'. Please choose a different CIDR range."
         elif "not found" in error_lower and "network" in error_lower:
             message = f"Network '{network_name}' not found in project '{project_id}'."
+        elif "ip range" in error_lower and ("conflict" in error_lower or "overlap" in error_lower):
+            message = f"IP range conflict: CIDR range '{cidr_range}' conflicts with an existing subnet in network '{network_name}'. Please choose a different range."
         else:
-            message = f"Error creating subnet: {e}"
+            message = f"Error creating subnet: {error_details}"
         
         return {
             "status": "error",
@@ -444,17 +469,24 @@ def create_subnet(
         error_details = str(e)
         error_lower = error_details.lower()
         
-        # Handle known error cases
+        # Debug logging for troubleshooting
+        print(f"[DEBUG] Subnet creation general error: {error_details}")
+        
+        # Handle known error cases with improved messages
         if "already exists" in error_lower:
             message = f"Subnet '{subnet_name}' already exists in region '{region}'."
         elif "permission denied" in error_lower:
             message = f"You don't have sufficient permissions to create a subnet in project '{project_id}'."
         elif "invalid cidr" in error_lower or "cidr range" in error_lower:
             message = f"Invalid CIDR range '{cidr_range}'. Please check the format (e.g., 172.0.0.0/24)."
+        elif "overlap" in error_lower or "conflict" in error_lower:
+            message = f"CIDR range '{cidr_range}' overlaps with an existing subnet. Please choose a different CIDR range that doesn't conflict with existing subnets."
         elif "not found" in error_lower:
             message = f"Resource not found. Check if network '{network_name}' exists in project '{project_id}'."
+        elif "route" in error_lower and "conflict" in error_lower:
+            message = f"Route conflict detected with CIDR range '{cidr_range}'. This may conflict with existing routes in the VPC."
         else:
-            message = f"Error creating subnet: {str(e)}"
+            message = f"Error creating subnet: {error_details}"
             
         return {
             "status": "error",
