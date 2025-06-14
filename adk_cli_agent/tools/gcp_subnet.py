@@ -26,6 +26,8 @@ def list_subnets(project_id: str, network_name: str) -> Dict[str, Any]:
     Returns:
         dict: Contains status and list of subnets
     """
+    print(f"--- Tool: list_subnets called with project_id={project_id}, network_name={network_name} ---")
+    
     # Basic validation to prevent common mistakes
     if "subnet" in network_name.lower() and not network_name.lower().endswith("-vpc"):
         print(f"[WARNING] The name '{network_name}' contains 'subnet' which suggests it might be a subnet name, not a network/VPC name")
@@ -35,7 +37,7 @@ def list_subnets(project_id: str, network_name: str) -> Dict[str, Any]:
             "details": "VPC network names typically end with '-vpc' and don't contain 'subnet'"
         }
         
-
+    # Get VPC details which includes subnet information
     vpc_details = get_vpc_details(project_id, network_name)
     if vpc_details.get("status") != "success":
         return {
@@ -43,8 +45,12 @@ def list_subnets(project_id: str, network_name: str) -> Dict[str, Any]:
             "message": f"Failed to get VPC details: {vpc_details.get('message', 'Unknown error')}",
             "details": vpc_details.get("details")
         }
+    
+    # Extract the subnets from the VPC details
     network = vpc_details.get("network", {})
     subnets = network.get("subnets", [])
+    
+    # Clean response format
     return {
         "status": "success",
         "message": f"Found {len(subnets)} subnets in VPC '{network_name}' (project '{project_id}')",
