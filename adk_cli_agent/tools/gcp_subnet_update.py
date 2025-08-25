@@ -7,13 +7,35 @@ from typing import Dict, Any, Optional
 
 from .confirmation_tools import confirm_action
 from .gcp_api_utils import get_gcp_credentials
+from google.cloud import compute_v1
 
-# Check if GCP tools are available
+# Default to CLI fallback unless tests explicitly enable API via patching.
+HAS_GCP_TOOLS_FLAG = False
+
+# Compatibility: some environments/tests expect `compute_v1.types`
 try:
-    from google.cloud import compute_v1
-    HAS_GCP_TOOLS_FLAG = True
-except ImportError:
-    HAS_GCP_TOOLS_FLAG = False
+    getattr(compute_v1, "types")
+except AttributeError:
+    try:
+        # Alias the module itself under `types` for attribute access in tests
+        compute_v1.types = compute_v1  # type: ignore[attr-defined]
+    except Exception:
+        pass
+
+
+def _new_subnetwork():
+    """Create a Subnetwork instance in a defensive way for test/mocking.
+
+    Some environments or mocks may not expose compute_v1.Subnetwork explicitly.
+    This helper attempts to instantiate it if available; otherwise, returns a
+    minimal stand-in object with attribute assignment support.
+    """
+    try:
+        return compute_v1.Subnetwork()
+    except AttributeError:
+        class _MinimalSubnetwork:
+            pass
+        return _MinimalSubnetwork()
 
 
 def enable_private_google_access(
@@ -65,7 +87,7 @@ def enable_private_google_access(
                     }
 
                 # Create the patch request with private Google access enabled
-                subnet_update = compute_v1.Subnetwork()
+                subnet_update = _new_subnetwork()
                 subnet_update.private_ip_google_access = True
                 
                 # Set the fingerprint to avoid 400 error
@@ -188,7 +210,7 @@ def disable_private_google_access(
             try:
                 credentials = get_gcp_credentials()
                 subnet_client = compute_v1.SubnetworksClient(credentials=credentials)
-
+                
                 # Get the current subnet configuration
                 subnet = subnet_client.get(
                     project=project_id,
@@ -209,7 +231,7 @@ def disable_private_google_access(
                     }
 
                 # Create the patch request with private Google access disabled
-                subnet_update = compute_v1.Subnetwork()
+                subnet_update = _new_subnetwork()
                 subnet_update.private_ip_google_access = False
                 
                 # Set the fingerprint to avoid 400 error

@@ -12,3 +12,8 @@ from .gcp_vpc import (
 )
 from .gcp_subnet import list_subnets, delete_subnet
 from .gcp_subnet_update import enable_private_google_access, disable_private_google_access
+from .gcp_service import (
+    enable_gcp_service_tool,
+    list_gcp_services_tool,
+    is_service_enabled
+)

@@ -84,6 +84,15 @@ The application must support the following tools, callable via AI understanding 
         **VPC Deletion Workflow Note:**
         When deleting a VPC network, the system will first attempt to delete all subnets within the VPC. Only after all subnets are successfully deleted will the VPC itself be deleted. The user will be prompted for confirmation before proceeding, and may be prompted for each subnet if desired. If any subnet cannot be deleted, the VPC deletion will be aborted and the user will be notified of the error(s). The system provides clear error messages for common scenarios like attempting to delete a VPC that is still in use by resources.
 
+*   **FR2.3.5 GCP Service Management:**
+    *   **FR2.3.5.1**: Enable required GCP services (e.g., Compute Engine API)
+        *   Check service status before enabling
+        *   Provide progress feedback during service activation
+        *   Handle activation errors gracefully
+    *   **FR2.3.5.2**: List enabled services for a project
+    *   **FR2.3.5.3**: Check if a specific service is enabled
+    *   **FR2.3.5.4**: Provide user-friendly messages for common service-related issues
+
 ### 4.3. Configuration
 
 *   **FR3.1 API Key Management**: Users must be able to configure API keys for the different AI services.

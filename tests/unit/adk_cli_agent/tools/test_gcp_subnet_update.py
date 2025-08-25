@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from adk_cli_agent.tools.gcp_subnet_update import enable_private_google_access, disable_private_google_access
+from google.cloud import compute_v1
 
 @pytest.fixture
 def mock_get_gcp_credentials():
@@ -15,8 +16,7 @@ def mock_get_gcp_credentials():
 @pytest.fixture
 def mock_compute_v1_subnetwork():
     """Mock the compute_v1.Subnetwork class."""
-    mock_subnetwork_class = MagicMock()
-    with patch("adk_cli_agent.tools.gcp_subnet_update.compute_v1.Subnetwork", return_value=mock_subnetwork_class):
+    with patch("google.cloud.compute_v1.Subnetwork", create=True) as mock_subnetwork_class:
         yield mock_subnetwork_class
 
 @pytest.fixture
@@ -37,6 +37,9 @@ def mock_compute_subnetworks_client(mock_compute_v1_subnetwork):
         mock_result = MagicMock()
         mock_operation.result.return_value = mock_result
         mock_client_instance.patch.return_value = mock_operation
+        
+        # Configure the mock to have the 'types' attribute
+        mock_client.types = compute_v1.types
         
         yield mock_client
 
