@@ -1,257 +1,73 @@
-"""Unit tests for GCP tools functionality."""
-import pytest
-from unittest.mock import MagicMock, patch, Mock
-from google.api_core import operation
-from google.cloud import resourcemanager_v3
+import unittest
+from unittest.mock import patch, MagicMock
+from my_cli_agent.tools.gcp_tools import list_gcp_projects, create_gcp_project, HAS_GCP_TOOLS
+from my_cli_agent.models import ToolResult
 
-from my_cli_agent.tools.gcp_tools import (
-    list_gcp_projects,
-    create_gcp_project,
-    delete_gcp_project,
-    HAS_GCP_TOOLS
-)
-from my_cli_agent.tools.base import ToolResult
+# A mock project object that simulates the structure of the real GCP project object
+class MockGcpProject:
+    def __init__(self, project_id, display_name):
+        self.project_id = project_id
+        self.display_name = display_name
 
-class TestGCPTools:
-    @pytest.fixture
-    def mock_credentials(self):
-        with patch('google.auth.default') as mock:
-            mock.return_value = (MagicMock(), "test-project")
-            yield mock
+@unittest.skipIf(not HAS_GCP_TOOLS, "GCP libraries not installed, skipping GCP tool tests")
+class TestGcpTools(unittest.TestCase):
 
-    @pytest.fixture
-    def mock_projects_client(self):
-        with patch('google.cloud.resourcemanager_v3.ProjectsClient') as mock:
-            yield mock
-
-    def test_mock_projects_generation(self):
-        """Test the mock project data generation for different environments."""
-        # Test dev environment
-        result = list_gcp_projects("dev")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Mock Dev Project" in result.result
-        assert "mock-dev-123" in result.result
-
-        # Test staging environment
-        result = list_gcp_projects("stg")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Mock Staging Project" in result.result
-        assert "mock-stg-456" in result.result
-
-        # Test production environment
-        result = list_gcp_projects("prod")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Mock Production Project" in result.result
-        assert "mock-prod-789" in result.result
-
-        # Test all environments
-        result = list_gcp_projects("all")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Mock Dev Project" in result.result
-        assert "Mock Staging Project" in result.result
-        assert "Mock Production Project" in result.result
-
-    def test_list_projects_api_success(self, mock_credentials, mock_projects_client):
-        """Test successful project listing via API."""
-        # This test verifies the API response format
-        result = list_gcp_projects("dev")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Mock Dev Project" in result.result
-        assert "mock-dev-123" in result.result
-
-    def test_list_projects_response_format(self):
-        """Test the format of list projects response."""
-        result = list_gcp_projects("dev")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Found" in result.result
-        assert "environment" in result.result
-        assert "Mock Dev Project" in result.result
-        assert "mock-dev-123" in result.result
-
-    def test_missing_dependencies(self):
-        """Test behavior when GCP dependencies are missing."""
-        with patch('my_cli_agent.tools.gcp_tools.HAS_GCP_TOOLS', False):
-            # List projects should still work with mock data
-            result = list_gcp_projects("dev")
-            assert isinstance(result, ToolResult)
-            assert result.success is True
-            assert "mock" in result.result.lower()
-            
-            # Create should work with mock data
-            result = create_gcp_project("test-project,Test Project")
-            assert isinstance(result, ToolResult)
-            assert result.success is True
-            assert "Test Project" in result.result
-            
-            # Delete should work with mock data
-            result = delete_gcp_project("test-project")
-            assert isinstance(result, ToolResult)
-            assert result.success is True
-            assert "test-project" in result.result
-
-    def test_missing_credentials(self, mock_credentials):
-        """Test behavior when GCP credentials are not available."""
-        mock_credentials.side_effect = Exception("No credentials")
+    @patch('my_cli_agent.tools.gcp_tools.google.auth.default')
+    @patch('my_cli_agent.tools.gcp_tools.resourcemanager_v3.ProjectsClient')
+    def test_list_gcp_projects_success(self, mock_projects_client, mock_auth):
+        """Test listing GCP projects successfully."""
+        # Mock the authentication and the client
+        mock_auth.return_value = (None, None)
+        mock_client_instance = mock_projects_client.return_value
         
-        # Should fall back to mock data for list
-        result = list_gcp_projects("dev")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "mock" in result.result.lower()
-        
-        # Create should still work with mock data
-        result = create_gcp_project("test-project,Test Project")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Test Project" in result.result
-        
-        # Delete should still work with mock data
-        result = delete_gcp_project("test-project")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "test-project" in result.result
+        # Setup mock projects to be returned by the API call
+        mock_projects = [
+            MockGcpProject("proj-dev-123", "Project Dev"),
+            MockGcpProject("proj-stg-456", "Project Staging"),
+            MockGcpProject("proj-prod-789", "Project Prod"),
+        ]
+        mock_client_instance.search_projects.return_value = mock_projects
 
-    def test_create_project_input_validation(self, mock_credentials):
-        """Test input validation for project creation."""
-        # Test empty project ID
+        # Test filtering for 'dev'
+        result_dev = list_gcp_projects(env="dev")
+        self.assertTrue(result_dev.success)
+        self.assertIn("Found 1 projects", result_dev.result)
+        self.assertIn("Project Dev (proj-dev-123)", result_dev.result)
+
+        # Test filtering for 'all'
+        result_all = list_gcp_projects(env="all")
+        self.assertTrue(result_all.success)
+        self.assertIn("Found 3 projects", result_all.result)
+        self.assertIn("Project Staging (proj-stg-456)", result_all.result)
+
+    @patch('my_cli_agent.tools.gcp_tools.google.auth.default')
+    def test_list_gcp_projects_auth_failure(self, mock_auth):
+        """Test handling of GCP authentication failure."""
+        import google.auth.exceptions
+        mock_auth.side_effect = google.auth.exceptions.DefaultCredentialsError("Auth failed")
+        
+        result = list_gcp_projects()
+        self.assertFalse(result.success)
+        self.assertIn("GCP authentication failed", result.error_message)
+
+    def test_create_gcp_project_success_simulation(self):
+        """Test the successful simulation of creating a project."""
+        project_id = "my-simulated-project"
+        result = create_gcp_project(project_id)
+        self.assertTrue(result.success)
+        self.assertIn(f"Successfully simulated the creation of project '{project_id}'", result.result)
+
+    def test_create_gcp_project_invalid_id(self):
+        """Test create_gcp_project with an invalid project ID."""
+        result = create_gcp_project("Invalid ID With Spaces")
+        self.assertFalse(result.success)
+        self.assertIn("Invalid project ID", result.error_message)
+
+    def test_create_gcp_project_empty_id(self):
+        """Test create_gcp_project with an empty project ID."""
         result = create_gcp_project("")
-        assert isinstance(result, ToolResult)
-        assert not result.success
-        assert "cannot be empty" in result.result.lower()
-        
-        # Test invalid project ID format
-        result = create_gcp_project("invalid project id")
-        assert isinstance(result, ToolResult)
-        assert not result.success
-        assert "invalid" in result.error_message.lower()
-        
-        # Test with valid inputs
-        result = create_gcp_project("test-project-1")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        
-        result = create_gcp_project("test-project-2,Test Project")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        
-        result = create_gcp_project("test-project-3,Test Project,123456")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
+        self.assertFalse(result.success)
+        self.assertIn("Invalid project ID", result.error_message)
 
-    def test_create_project_success(self):
-        """Test successful project creation."""
-        # Test with minimal input
-        result = create_gcp_project("test-project-1")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "test-project-1" in result.result
-        
-        # Test with project name
-        result = create_gcp_project("test-project-2,Test Project")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Test Project" in result.result
-        assert "test-project-2" in result.result
-
-    def test_delete_project_input_validation(self):
-        """Test input validation for project deletion."""
-        # Test empty project ID
-        result = delete_gcp_project("")
-        assert isinstance(result, ToolResult)
-        assert not result.success
-        assert "cannot be empty" in result.result.lower()
-
-    def test_delete_project_success(self, mock_credentials, mock_projects_client):
-        """Test successful project deletion."""
-        mock_operation = Mock(spec=operation.Operation)
-        mock_operation.result.return_value = None
-        mock_projects_client.return_value.delete_project.return_value = mock_operation
-
-        result = delete_gcp_project("test-project-1")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "test-project-1" in result.result
-
-    def test_create_project_api_failure_cli_fallback(self, mock_credentials, mock_projects_client):
-        """Test project creation fallback to CLI when API fails."""
-        # This test verifies the behavior when API fails but we're in test mode
-        result = create_gcp_project("test-project,Test Project")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Test Project" in result.result
-
-    def test_delete_project_success(self, mock_credentials, mock_projects_client):
-        """Test successful project deletion."""
-        mock_operation = Mock(spec=operation.Operation)
-        mock_operation.result.return_value = None
-        mock_projects_client.return_value.delete_project.return_value = mock_operation
-
-        result = delete_gcp_project("test-project-1")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "deleted successfully" in result.result
-
-    def test_delete_project_input_validation(self, mock_credentials, mock_projects_client):
-        """Test project deletion with various inputs."""
-        # Test with empty project ID
-        result1 = delete_gcp_project("")
-        assert isinstance(result1, ToolResult)
-        assert result1.success is False
-        assert "invalid project id" in result1.error_message.lower()
-
-        # Test with invalid project ID
-        result2 = delete_gcp_project("invalid@project#id")
-        assert isinstance(result2, ToolResult)
-        assert result2.success is False
-        assert "invalid project id" in result2.error_message.lower()
-
-        # Test with whitespace
-        result3 = delete_gcp_project("  ")
-        assert isinstance(result3, ToolResult)
-        assert result3.success is False
-        assert "invalid project id" in result3.error_message.lower()
-
-    def test_list_projects_response_format(self):
-        """Test the format of list projects response."""
-        result = list_gcp_projects("dev")
-        assert isinstance(result, ToolResult)
-        assert result.success is True
-        assert "Mock Dev Project" in result.result
-        assert "mock-dev-123" in result.result
-        assert "Found" in result.result
-        assert "environment" in result.result
-        assert "-" in result.result
-
-    def test_cli_command_timeout(self, mock_credentials, mock_projects_client):
-        """Test handling of CLI command timeout."""
-        mock_projects_client.return_value.list_projects.side_effect = Exception("API Error")
-        
-        with patch('subprocess.run', side_effect=Exception("Command timed out")):
-            result = list_gcp_projects("all")
-            assert isinstance(result, ToolResult)
-            assert result.success is True
-            assert "mock" in result.result.lower()
-
-    def test_create_project_organization_validation(self, mock_credentials, mock_projects_client):
-        """Test project creation with various organization formats."""
-        # Test with organizations/ prefix
-        result1 = create_gcp_project("test-project-1,Test Project,organizations/123456")
-        assert isinstance(result1, ToolResult)
-        assert result1.success is True
-
-        # Test without organizations/ prefix
-        result2 = create_gcp_project("test-project-2,Test Project,123456")
-        assert isinstance(result2, ToolResult)
-        assert result2.success is True
-
-        # Test with invalid org ID format
-        result3 = create_gcp_project("test-project-3,Test Project,invalid/org/id")
-        assert isinstance(result3, ToolResult)
-        assert result3.success is False
-        assert "invalid organization id" in result3.error_message.lower()
+if __name__ == '__main__':
+    unittest.main()

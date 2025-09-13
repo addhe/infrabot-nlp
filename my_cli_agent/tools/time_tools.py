@@ -1,7 +1,7 @@
 import datetime
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Dict
-from .base import ToolResult
+from my_cli_agent.models import ToolResult
 
 # Map of supported cities to their timezone identifiers
 TIMEZONE_MAP: Dict[str, str] = {
@@ -15,53 +15,43 @@ TIMEZONE_MAP: Dict[str, str] = {
     "utc": "UTC"
 }
 
-def get_current_time(city: str = "") -> ToolResult:
+def get_current_time(city: str = "UTC") -> ToolResult:
     """
-    Get the current time for a city.
-    
-    Args:
-        city: Name of the city to get time for. Defaults to UTC if not provided.
-        
-    Returns:
-        ToolResult containing the current time or an error message.
-    """
-    return get_time_for_city(city if city else "UTC")
+    Gets the current time for a specified city.
 
-def get_time_for_city(city: str) -> ToolResult:
-    """
-    Returns the current time for a specified city.
-    
     Args:
-        city: Name of the city to get time for
-        
+        city: The name of the city. Defaults to "UTC".
+
     Returns:
-        ToolResult containing the current time or an error message
+        A ToolResult object with the current time or an error message.
     """
     if not city:
-        return ToolResult(
-            success=False,
-            result="City name cannot be empty"
-        )
-    
+        city = "UTC" # Default to UTC if city is an empty string
+
     city_lower = city.lower()
     tz_identifier = TIMEZONE_MAP.get(city_lower)
-    
+
     if not tz_identifier:
         available_cities = ", ".join(sorted(TIMEZONE_MAP.keys()))
         return ToolResult(
             success=False,
-            result=f"Invalid city: {city}. Available cities: {available_cities}"
+            error_message=f"Unknown city: '{city}'. Available cities are: {available_cities}."
         )
-    
+
     try:
-        current_time = datetime.datetime.now(ZoneInfo(tz_identifier))
-        formatted_time = current_time.strftime("%H:%M:%S %Z%z")
+        now = datetime.datetime.now(ZoneInfo(tz_identifier))
+        formatted_time = now.strftime("%A, %Y-%m-%d %H:%M:%S %Z")
         return ToolResult(
             success=True,
-            result=f"Current time in {city}: {formatted_time}"
+            result=f"The current time in {city.title()} is {formatted_time}."
+        )
+    except ZoneInfoNotFoundError:
+        return ToolResult(
+            success=False,
+            error_message=f"Timezone data not found for '{tz_identifier}'. The server environment may be misconfigured."
         )
     except Exception as e:
         return ToolResult(
             success=False,
-            result=f"Error getting time for {city}: {str(e)}"
+            error_message=f"An unexpected error occurred while getting the time for '{city}': {e}"
         )
