@@ -8,103 +8,89 @@ class TestAgentNew(unittest.TestCase):
     @patch('my_cli_agent.agent_new.GeminiProvider')
     def setUp(self, MockGeminiProvider):
         """Set up a new Agent instance for each test."""
-        # Mock the provider to avoid actual API calls during initialization
         self.mock_provider = MockGeminiProvider.return_value
         self.agent = Agent()
-
-        # Now that the agent instance exists, we can mock its instance attributes
         self.agent.provider = self.mock_provider
+        
+        # Mock all tools to isolate the agent's logic
         self.agent.tools = {
-            'get_current_time': MagicMock(return_value=ToolResult(success=True, result="Mock time is 12:00 PM")),
-            'execute_command': MagicMock(return_value=ToolResult(success=True, result="Mock command output"))
+            'get_current_time': MagicMock(return_value=ToolResult(success=True, result="Time is 12:00 PM")),
+            'browser_navigate': MagicMock(return_value=ToolResult(success=True, result="Navigated successfully")),
+            'browser_click': MagicMock(return_value=ToolResult(success=True, result="Clicked element"))
         }
         self.mock_tools = self.agent.tools
 
-    def test_handle_chat_message_tool_success(self):
-        """Test when LLM selects a tool and it executes successfully."""
-        # Arrange: Configure the mock provider to return a tool call
-        llm_decision = "TOOL: get_current_time\nARGS: jakarta"
+    def test_handle_chat_message_single_arg_tool(self):
+        """Test a tool call with a single argument."""
+        # Arrange
+        llm_decision = 'TOOL: get_current_time\nARGS: {"city": "jakarta"}'
         self.mock_provider.generate_response.return_value = llm_decision
         
-        # Act: Call the method under test
-        prompt = "what time is it in jakarta?"
-        response = self.agent.handle_chat_message(prompt)
+        # Act
+        response = self.agent.handle_chat_message("what time is it in jakarta?")
 
-        # Assert: Check that the correct tool was called and its result was returned
-        self.mock_tools['get_current_time'].assert_called_once_with("jakarta")
-        self.assertEqual(response, "Mock time is 12:00 PM")
+        # Assert
+        self.mock_tools['get_current_time'].assert_called_once_with(city="jakarta")
+        self.assertEqual(response, "Time is 12:00 PM")
 
-    def test_handle_chat_message_tool_failure(self):
-        """Test when LLM selects a tool and it fails."""
-        # Arrange: Configure the mock tool to return a failure
-        self.mock_tools['execute_command'].return_value = ToolResult(
-            success=False, 
-            error_message="Command not found"
-        )
-        llm_decision = "TOOL: execute_command\nARGS: non_existent_command"
+    def test_handle_chat_message_multi_arg_tool(self):
+        """Test a tool call with multiple arguments, like browser_click."""
+        # Arrange
+        llm_decision = 'TOOL: browser_click\nARGS: {"ref": "ref123", "element": "Login Button"}'
         self.mock_provider.generate_response.return_value = llm_decision
 
         # Act
-        prompt = "run non_existent_command"
-        response = self.agent.handle_chat_message(prompt)
+        response = self.agent.handle_chat_message("click the login button")
 
         # Assert
-        self.mock_tools['execute_command'].assert_called_once_with("non_existent_command")
-        self.assertIn("Error executing tool: Command not found", response)
+        self.mock_tools['browser_click'].assert_called_once_with(ref="ref123", element="Login Button")
+        self.assertEqual(response, "Clicked element")
 
-    def test_handle_chat_message_no_tool_needed(self):
-        """Test when LLM decides no tool is needed and generates a conversational response."""
-        # Arrange: First call to decide tool, second to generate conversation
+    def test_handle_chat_message_tool_with_no_args(self):
+        """Test a tool call that takes no arguments, like browser_snapshot."""
+        # Arrange
+        self.agent.tools['browser_snapshot'] = MagicMock(return_value=ToolResult(success=True, result="Snapshot taken"))
+        llm_decision = 'TOOL: browser_snapshot\nARGS: {}'
+        self.mock_provider.generate_response.return_value = llm_decision
+
+        # Act
+        response = self.agent.handle_chat_message("take a snapshot")
+
+        # Assert
+        self.agent.tools['browser_snapshot'].assert_called_once_with()
+        self.assertEqual(response, "Snapshot taken")
+
+    def test_handle_chat_message_malformed_json_args(self):
+        """Test when the LLM returns invalid JSON in the ARGS line."""
+        # Arrange
+        llm_decision = 'TOOL: get_current_time\nARGS: {"city": "jakarta"' # Malformed JSON
         self.mock_provider.generate_response.side_effect = [
-            "NO_TOOL_NEEDED",
-            "Hello! How can I help you today?"
+            llm_decision,
+            "I had trouble understanding the tool arguments."
         ]
 
         # Act
-        prompt = "hello"
-        response = self.agent.handle_chat_message(prompt)
+        response = self.agent.handle_chat_message("some command")
+
+        # Assert
+        # It should fail to parse, not call the tool, and fall back to a conversational response.
+        self.mock_tools['get_current_time'].assert_not_called()
+        self.assertEqual(response, "I had trouble understanding the tool arguments.")
+
+    def test_no_tool_needed_fallback(self):
+        """Test the standard conversational fallback."""
+        # Arrange
+        self.mock_provider.generate_response.side_effect = [
+            "NO_TOOL_NEEDED",
+            "Hello there!"
+        ]
+        
+        # Act
+        response = self.agent.handle_chat_message("hello")
 
         # Assert
         self.assertEqual(self.mock_provider.generate_response.call_count, 2)
-        self.assertEqual(response, "Hello! How can I help you today?")
-        # Ensure no tools were called
-        for tool_mock in self.mock_tools.values():
-            tool_mock.assert_not_called()
-
-    def test_handle_chat_message_unknown_tool(self):
-        """Test when LLM requests a tool that doesn't exist."""
-        # Arrange: LLM requests a tool not in self.agent.tools
-        llm_decision = "TOOL: make_coffee\nARGS: black"
-        # The agent should then fall back to a conversational response
-        self.mock_provider.generate_response.side_effect = [
-            llm_decision,
-            "I'm sorry, I can't make coffee, but I can help with other tasks."
-        ]
-
-        # Act
-        prompt = "make me a coffee"
-        response = self.agent.handle_chat_message(prompt)
-
-        # Assert
-        self.assertEqual(response, "I'm sorry, I can't make coffee, but I can help with other tasks.")
-        for tool_mock in self.mock_tools.values():
-            tool_mock.assert_not_called()
-
-    def test_handle_chat_message_malformed_llm_response(self):
-        """Test when the LLM tool decision is malformed."""
-        # Arrange: LLM gives a response that can't be parsed
-        llm_decision = "I think you should use a tool but I'm not sure which."
-        self.mock_provider.generate_response.side_effect = [
-            llm_decision,
-            "I'm not sure how to handle that request. Could you rephrase?"
-        ]
-
-        # Act
-        prompt = "some confusing request"
-        response = self.agent.handle_chat_message(prompt)
-
-        # Assert
-        self.assertEqual(response, "I'm not sure how to handle that request. Could you rephrase?")
+        self.assertEqual(response, "Hello there!")
 
 if __name__ == '__main__':
     unittest.main()

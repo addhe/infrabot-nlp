@@ -1,9 +1,28 @@
 import os
 import logging
+import io
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
+
+# --- Load environment variables ---
+dotenv_secret = os.environ.get("DOTENV_CONTENTS")
+logging.info(f"DOTENV_CONTENTS variable found: {dotenv_secret is not None}")
+if dotenv_secret:
+    logging.info("Attempting to load environment from DOTENV_CONTENTS...")
+    # Use StringIO to treat the string as a file for dotenv.
+    load_dotenv(stream=io.StringIO(dotenv_secret))
+else:
+    logging.info("DOTENV_CONTENTS not found. Loading from .env file for local dev.")
+    load_dotenv()
+
+# Explicitly log the key we are looking for to confirm it was loaded.
+api_key_check = os.environ.get("GOOGLE_API_KEY")
+logging.info(f"GOOGLE_API_KEY is set after load: {api_key_check is not None}")
+if not api_key_check:
+    logging.warning("CRITICAL: GOOGLE_API_KEY was not loaded into the environment.")
 
 # --- Placeholder for future imports ---
 # from google.oauth2 import id_token

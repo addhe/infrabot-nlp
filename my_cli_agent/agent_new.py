@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 from typing import Dict, List, Callable
 
 # Import AI provider
@@ -9,6 +10,11 @@ from .providers.gemini import GeminiProvider
 from .tools.time_tools import get_current_time
 from .tools.command_tools import execute_command
 from .tools.gcp_tools import list_gcp_projects, create_gcp_project, HAS_GCP_TOOLS
+from .tools.mcp_tools import call_mcp_server
+from .tools.sequential_thinking_tools import call_sequential_thinking_server
+from .tools.markdown_tools import convert_file_to_markdown
+from .tools.playwright_tools import browser_navigate, browser_snapshot, browser_click, browser_type
+from .tools.gcloud_mcp_tools import run_gcloud_command
 from .models import ToolResult
 
 class Agent:
@@ -42,11 +48,19 @@ class Agent:
         self.tools["convert_file_to_markdown"] = convert_file_to_markdown
         
         # Add Playwright tools for browser automation
-        from .tools.playwright_tools import browser_navigate, browser_snapshot, browser_click, browser_type
+        from .tools.playwright_tools import browser_initialize, browser_navigate, browser_snapshot, browser_click, browser_type
+        self.tools["browser_initialize"] = browser_initialize
         self.tools["browser_navigate"] = browser_navigate
         self.tools["browser_snapshot"] = browser_snapshot
         self.tools["browser_click"] = browser_click
         self.tools["browser_type"] = browser_type
+        
+        # Add gcloud MCP tool for native GCP commands
+        from .tools.gcloud_mcp_tools import run_gcloud_command
+        self.tools["run_gcloud_command"] = run_gcloud_command
+        
+        # Internal state to track browser session
+        self.browser_session_active = False
         
         logging.info(f"Agent initialized with {len(self.tools)} tools.")
 
@@ -61,50 +75,41 @@ class Agent:
 
     def handle_chat_message(self, prompt: str) -> str:
         """
-
         Processes a user's chat message, decides whether to use a tool,
         executes it, and returns a formatted string response.
-
-        Args:
-            prompt: The user's message from the chat.
-
-        Returns:
-            A string containing the response to be sent back to the user.
         """
         try:
-            # 1. Create a prompt to ask the LLM to select a tool.
             tool_selection_prompt = self._create_tool_selection_prompt(prompt)
-            
-            # 2. Get the LLM's decision on which tool to use.
-            # We use a short, non-streamed response for this internal step.
             llm_decision_str = self.provider.generate_response(tool_selection_prompt, [])
 
-            # 3. Parse the decision and execute the tool if needed.
             if "TOOL:" in llm_decision_str:
                 try:
-                    tool_name, tool_arg = self._parse_tool_call(llm_decision_str)
+                    tool_name, tool_args = self._parse_tool_call(llm_decision_str)
 
                     if tool_name in self.tools:
-                        logging.info(f"Executing tool '{tool_name}' with arg: '{tool_arg}'")
+                        logging.info(f"Executing tool '{tool_name}' with args: {tool_args}")
                         tool_function = self.tools[tool_name]
-                        result: ToolResult = tool_function(tool_arg)
+                        
+                        # Check if a browser tool is called without an active session
+                        if tool_name.startswith("browser_") and tool_name != "browser_initialize" and not self.browser_session_active:
+                            return "Error: A browser session has not been initialized. Please start by asking to initialize the browser."
+
+                        result: ToolResult = tool_function(**tool_args)
                         
                         if result.success:
+                            # If initialization was successful, update the state
+                            if tool_name == "browser_initialize":
+                                self.browser_session_active = True
                             return result.result
                         else:
                             logging.warning(f"Tool '{tool_name}' failed: {result.error_message}")
                             return f"Error executing tool: {result.error_message}"
                     else:
                         logging.warning(f"LLM requested an unknown tool: '{tool_name}'")
-                        # Fall through to conversational response if tool is unknown
                 except ValueError as e:
                     logging.warning(f"Could not parse LLM tool decision: {e}. Raw response: '{llm_decision_str}'")
-                    # Fall through to conversational response
         
-            # 4. If no tool is needed (or if parsing failed), generate a direct conversational response.
-            logging.info("No tool executed. Generating conversational response.")
-            # For the final response, we can stream it if the provider supports it.
-            # For simplicity in this backend version, we'll use the standard generation.
+            logging.info("No tool executed or tool call failed. Generating conversational response.")
             conversation_history = [{"role": "user", "content": prompt}]
             response = self.provider.generate_response(prompt, conversation_history)
             return response
@@ -115,57 +120,55 @@ class Agent:
 
     def _create_tool_selection_prompt(self, user_prompt: str) -> str:
         """Creates a system prompt for the LLM to select a tool."""
-        
-        # Basic instructions
         instructions = [
-            f"User request: \"{user_prompt}\"",
+            f'User request: "{user_prompt}"',
             "Analyze the user's request and determine if one of the following tools can fulfill it.",
             "Available tools:",
         ]
-
-        # Dynamically list available tools
         for name in self.tools.keys():
             instructions.append(f"- {name}")
 
-        instructions.append(
-            "\nUse the 'call_mcp_server' tool for complex, multi-step tasks such as code reviews, debugging, planning, or security audits."
-        )
-        instructions.append(
-            "Use the 'call_sequential_thinking_server' tool for problems that require deep, step-by-step reasoning, analysis, or breaking down a complex question."
-        )
-        instructions.append(
-            "Use the 'convert_file_to_markdown' tool to read and convert the content of a local file (like a PDF or DOCX) into Markdown text."
-        )
+        instructions.append("\nUse the 'call_mcp_server' tool for complex, multi-step tasks such as code reviews, debugging, planning, or security audits.")
+        instructions.append("Use the 'call_sequential_thinking_server' tool for problems that require deep, step-by-step reasoning, analysis, or breaking down a complex question.")
+        instructions.append("Use the 'convert_file_to_markdown' tool to read and convert the content of a local file (like a PDF or DOCX) into Markdown text.")
         instructions.extend([
-            "\nFor web browser tasks, use the following tools in sequence:",
-            "- Use 'browser_navigate' to go to a URL.",
-            "- Use 'browser_snapshot' to get a list of elements on the page.",
-            "- Use 'browser_click' or 'browser_type' with the 'ref' from the snapshot to interact with elements."
+            "\nFor web browser tasks, you MUST follow this sequence:",
+            "1. ALWAYS call 'browser_initialize' FIRST to start the session.",
+            "2. Then, you can use other browser tools like 'browser_navigate', 'browser_snapshot', 'browser_click', or 'browser_type'."
         ])
-
-        # Response format instructions
+        instructions.append("Use 'run_gcloud_command' for any tasks related to Google Cloud Platform. The arguments should be a list of strings, for example: ['compute', 'instances', 'list', '--project=my-project']")
+        
         instructions.extend([
-            "If a tool is appropriate, respond in the following format ONLY:",
+            "\nRespond in the following format ONLY:",
             "TOOL: <tool_name>",
-            "ARGS: <arguments_for_the_tool>",
+            "ARGS: {\"arg_name1\": \"value1\", \"arg_name2\": \"value2\"}",
             "\nIf no tool is suitable, respond with the single phrase: NO_TOOL_NEEDED"
         ])
         
         return "\n".join(instructions)
 
-    def _parse_tool_call(self, llm_response: str) -> tuple[str, str]:
-        """Parses the LLM's response to extract the tool name and arguments."""
+    def _parse_tool_call(self, llm_response: str) -> tuple[str, dict]:
+        """Parses the LLM's response to extract the tool name and arguments as a dictionary."""
         lines = llm_response.strip().split('\n')
         tool_name = ""
-        tool_arg = ""
+        args_str = ""
 
         for line in lines:
             if line.startswith("TOOL:"):
                 tool_name = line.replace("TOOL:", "").strip()
             elif line.startswith("ARGS:"):
-                tool_arg = line.replace("ARGS:", "").strip()
+                json_start = line.find('{')
+                if json_start != -1:
+                    args_str = line[json_start:]
         
         if not tool_name:
             raise ValueError("Response did not contain 'TOOL:' line.")
-            
-        return tool_name, tool_arg
+        
+        if not args_str:
+            return tool_name, {{}}
+
+        try:
+            args_dict = json.loads(args_str)
+            return tool_name, args_dict
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse JSON arguments: {e}. Raw args string: '{args_str}'")
