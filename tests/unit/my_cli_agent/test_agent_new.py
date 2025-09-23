@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch, MagicMock
 from my_cli_agent.agent_new import Agent
@@ -93,6 +94,51 @@ class TestAgentNew(unittest.TestCase):
         # Assert
         self.assertEqual(self.mock_provider.generate_response.call_count, 2)
         self.assertEqual(response, "Hello there!")
+
+    def test_handle_chat_message_tool_failure(self):
+        """Test the scenario where a tool executes but returns a failure."""
+        # Arrange
+        self.mock_tools['get_current_time'].return_value = ToolResult(success=False, error_message="Time machine broke")
+        llm_decision = 'TOOL: get_current_time\nARGS: {}'
+        self.mock_provider.generate_response.return_value = llm_decision
+
+        # Act
+        response = self.agent.handle_chat_message("what time is it?")
+
+        # Assert
+        self.assertIn("Error executing tool: Time machine broke", response)
+
+    def test_browser_initialize_sets_state(self):
+        """Test that calling browser_initialize correctly sets the agent's state."""
+        # Arrange
+        self.agent.tools['browser_initialize'] = MagicMock(return_value=ToolResult(success=True, result="Browser ready"))
+        llm_decision = 'TOOL: browser_initialize\nARGS: {}'
+        self.mock_provider.generate_response.return_value = llm_decision
+        self.assertFalse(self.agent.browser_session_active) # Pre-condition
+
+        # Act
+        self.agent.handle_chat_message("init browser")
+
+        # Assert
+        self.assertTrue(self.agent.browser_session_active)
+
+    def test_parse_tool_call_no_tool_line(self):
+        """Test parsing a response that is missing the TOOL: line."""
+        with self.assertRaisesRegex(ValueError, "did not contain 'TOOL:' line"):
+            self.agent._parse_tool_call('ARGS: {"city": "jakarta"}')
+
+    def test_parse_tool_call_no_args_line(self):
+        """Test parsing a response with a tool but no ARGS line."""
+        tool_name, args = self.agent._parse_tool_call('TOOL: some_tool')
+        self.assertEqual(tool_name, 'some_tool')
+        self.assertEqual(args, {})
+
+    @patch.dict(os.environ, clear=True)
+    def test_setup_provider_no_api_key(self):
+        """Test that the agent raises an error if the API key is not set."""
+        with self.assertRaises(ValueError):
+            # This test needs to instantiate a new agent to trigger the real _setup_provider
+            Agent()
 
 if __name__ == '__main__':
     unittest.main()

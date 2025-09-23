@@ -11,7 +11,8 @@ setup(
         "anthropic",
         "python-dotenv",
         "google-cloud-core",
-        "google-cloud-resource-manager"
+        "google-cloud-resource-manager",
+        "markitdown"
     ],
     extras_require={
         "dev": [

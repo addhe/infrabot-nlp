@@ -164,7 +164,7 @@ class Agent:
             raise ValueError("Response did not contain 'TOOL:' line.")
         
         if not args_str:
-            return tool_name, {{}}
+            return tool_name, {}
 
         try:
             args_dict = json.loads(args_str)
