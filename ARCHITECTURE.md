@@ -70,16 +70,15 @@ Sistem ini menggunakan arsitektur berbasis webhook. Google Chat mengirimkan even
     *   Mengorkestrasi eksekusi *tool*.
     *   Jika tidak ada *tool* yang cocok, ia akan menghasilkan respons percakapan umum menggunakan LLM.
 
-### 4.3. Lapisan Akses Layanan & Data (`my_cli_agent/tools/`)
+### 4.3. Lapisan Akses Layanan & Data (`my_cli_agent/tools/` dan `my_cli_agent/providers/`)
 
-*   **Teknologi:** Python, `requests`, library pihak ketiga (`markitdown`, `google-cloud-resource-manager`).
+*   **Teknologi:** Python, `requests`, library pihak ketiga.
 *   **Tanggung Jawab:**
-    *   Mengabstraksi interaksi dengan layanan eksternal. Setiap file di direktori ini mewakili satu set kemampuan.
-    *   **`command_tools.py`:** Berinteraksi dengan shell sistem lokal.
-    *   **`gcp_tools.py`:** Berinteraksi dengan Google Cloud APIs.
-    *   **`mcp_tools.py`, `sequential_thinking_tools.py`, `playwright_tools.py`:** Berinteraksi dengan server MCP eksternal melalui HTTP.
-    *   **`markdown_tools.py`:** Berinteraksi dengan library `markitdown` lokal.
-    *   Setiap *tool* bertanggung jawab untuk menangani logikanya sendiri, termasuk penanganan kesalahan, dan mengembalikan hasil dalam format `ToolResult` yang terstandardisasi.
+    *   Mengabstraksi interaksi dengan layanan eksternal. Fungsionalitas diorganisir ke dalam *Tools* dan *Providers*.
+    *   **Direktori `tools/`**: Berisi modul-modul untuk *tool* yang memiliki logika unik atau kompleks. Contohnya termasuk `command_tools.py` (interaksi shell), `gcp_tools.py` (interaksi Google Cloud API), dan `playwright_tools.py` (otomasi browser).
+    *   **Direktori `providers/`**: Berisi modul yang berfungsi sebagai "pabrik" (*factories*) untuk menghasilkan *tools* secara dinamis dari sebuah konfigurasi.
+        *   **`mcp.py`**: Ini adalah contoh utama dari pola provider. File ini mendefinisikan daftar konfigurasi untuk semua *tool* MCP yang sederhana (berbasis HTTP POST). Ia menggunakan fungsi pembantu dari `tools/tool_utils.py` untuk secara dinamis membuat setiap fungsi *tool*, lengkap dengan deskripsi dan penanganan error. Pendekatan ini secara drastis menyederhanakan penambahan *tool* MCP baru.
+    *   Setiap *tool*, baik yang dibuat secara manual di `tools/` maupun yang dibuat secara dinamis oleh provider, bertanggung jawab untuk menangani logikanya sendiri dan mengembalikan hasil dalam format `ToolResult` yang terstandardisasi.
 
 ## 5. Alur Data
 

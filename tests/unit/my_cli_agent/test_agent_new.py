@@ -16,7 +16,8 @@ class TestAgentNew(unittest.TestCase):
         self.agent.tools = {
             'get_current_time': MagicMock(return_value=ToolResult(success=True, result="Time is 12:00 PM")),
             'browser_navigate': MagicMock(return_value=ToolResult(success=True, result="Navigated successfully")),
-            'browser_click': MagicMock(return_value=ToolResult(success=True, result="Clicked element"))
+            'browser_click': MagicMock(return_value=ToolResult(success=True, result="Clicked element")),
+            'browser_snapshot': MagicMock(return_value=ToolResult(success=True, result="Snapshot taken"))
         }
         self.mock_tools = self.agent.tools
 
@@ -36,6 +37,7 @@ class TestAgentNew(unittest.TestCase):
     def test_handle_chat_message_multi_arg_tool(self):
         """Test a tool call with multiple arguments, like browser_click."""
         # Arrange
+        self.agent.browser_session_active = True  # Prerequisite for browser tools
         llm_decision = 'TOOL: browser_click\nARGS: {"ref": "ref123", "element": "Login Button"}'
         self.mock_provider.generate_response.return_value = llm_decision
 
@@ -49,7 +51,7 @@ class TestAgentNew(unittest.TestCase):
     def test_handle_chat_message_tool_with_no_args(self):
         """Test a tool call that takes no arguments, like browser_snapshot."""
         # Arrange
-        self.agent.tools['browser_snapshot'] = MagicMock(return_value=ToolResult(success=True, result="Snapshot taken"))
+        self.agent.browser_session_active = True  # Prerequisite for browser tools
         llm_decision = 'TOOL: browser_snapshot\nARGS: {}'
         self.mock_provider.generate_response.return_value = llm_decision
 
@@ -57,7 +59,7 @@ class TestAgentNew(unittest.TestCase):
         response = self.agent.handle_chat_message("take a snapshot")
 
         # Assert
-        self.agent.tools['browser_snapshot'].assert_called_once_with()
+        self.mock_tools['browser_snapshot'].assert_called_once_with()
         self.assertEqual(response, "Snapshot taken")
 
     def test_handle_chat_message_malformed_json_args(self):
