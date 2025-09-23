@@ -5,13 +5,13 @@ setup(
     version="0.1.0",
     packages=find_packages(exclude=["tests*"]),
     install_requires=[
+        "flask",
         "google-generativeai",
         "openai",
         "anthropic",
         "python-dotenv",
         "google-cloud-core",
-        "google-cloud-resource-manager",
-        "google-adk>=0.1.0"
+        "google-cloud-resource-manager"
     ],
     extras_require={
         "dev": [

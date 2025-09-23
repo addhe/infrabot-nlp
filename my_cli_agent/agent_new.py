@@ -6,16 +6,18 @@ from typing import Dict, List, Callable
 # Import AI provider
 from .providers.gemini import GeminiProvider
 
+# Import AI provider
+from .providers.gemini import GeminiProvider
+from .providers.mcp import get_mcp_tools
+
 # Import tools and models
 from .tools.time_tools import get_current_time
 from .tools.command_tools import execute_command
 from .tools.gcp_tools import list_gcp_projects, create_gcp_project, HAS_GCP_TOOLS
-from .tools.mcp_tools import call_mcp_server
-from .tools.sequential_thinking_tools import call_sequential_thinking_server
 from .tools.markdown_tools import convert_file_to_markdown
 from .tools.playwright_tools import browser_navigate, browser_snapshot, browser_click, browser_type
 from .tools.gcloud_mcp_tools import run_gcloud_command
-from .models import ToolResult
+from .models import Tool, ToolResult
 
 class Agent:
     """
@@ -35,13 +37,10 @@ class Agent:
             self.tools["list_gcp_projects"] = list_gcp_projects
             self.tools["create_gcp_project"] = create_gcp_project
         
-        # Add the MCP tool by default if its dependencies are met
-        from .tools.mcp_tools import call_mcp_server
-        self.tools["call_mcp_server"] = call_mcp_server
-        
-        # Add the Sequential Thinking MCP tool
-        from .tools.sequential_thinking_tools import call_sequential_thinking_server
-        self.tools["call_sequential_thinking_server"] = call_sequential_thinking_server
+        # Add MCP tools from the centralized provider
+        mcp_tools = get_mcp_tools()
+        for tool in mcp_tools:
+            self.tools[tool.name] = tool.func
         
         # Add the MarkItDown tool
         from .tools.markdown_tools import convert_file_to_markdown

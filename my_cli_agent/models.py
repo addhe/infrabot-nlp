@@ -1,5 +1,12 @@
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Callable
+
+@dataclass
+class Tool:
+    """Represents a tool that the agent can execute."""
+    name: str
+    description: str
+    func: Callable[..., 'ToolResult']
 
 @dataclass
 class ToolResult:

@@ -91,16 +91,16 @@ Struktur proyek telah di-refactor untuk mendukung arsitektur layanan web:
 ├── my_cli_agent/             # Logika inti agen
 │   ├── __init__.py
 │   ├── agent_new.py          # Kelas Agent utama
-│   ├── models.py             # Model data (misalnya, ToolResult)
-│   ├── providers/            # Penyedia LLM (hanya Gemini)
-│   └── tools/                # Semua tool yang dapat dieksekusi
+│   ├── models.py             # Model data (Tool, ToolResult)
+│   ├── providers/            # Penyedia LLM dan Tool
+│   │   ├── gemini.py
+│   │   └── mcp.py            # <-- Provider untuk MCP Tools
+│   └── tools/                # Tool-tool individual
 │       ├── command_tools.py
 │       ├── gcp_tools.py
 │       ├── markdown_tools.py
-│       ├── mcp_tools.py
-│       ├── playwright_tools.py
-│       ├── sequential_thinking_tools.py
-│       └── time_tools.py
+│       ├── playwright_tools.py # (Contoh tool yang lebih kompleks)
+│       └── tool_utils.py     # <-- Helper untuk MCP Tools
 │
 ├── tests/                    # Semua tes unit
 │   └── unit/
@@ -110,7 +110,39 @@ Struktur proyek telah di-refactor untuk mendukung arsitektur layanan web:
 └── *.md                      # Dokumentasi proyek
 ```
 
-## 6. Kontribusi
+## 6. Menambahkan Tools Baru (MCP)
+
+Sistem ini dirancang agar mudah diperluas, terutama untuk menambahkan *tool* baru yang berinteraksi dengan server MCP (Mission Control Plane) berbasis HTTP POST.
+
+Untuk menambahkan *tool* MCP baru yang mengikuti pola "prompt-in, response-out" sederhana:
+
+1.  **Buka file `my_cli_agent/providers/mcp.py`**.
+2.  **Tambahkan definisi baru** ke dalam list `MCP_TOOL_DEFINITIONS`. Setiap definisi adalah sebuah dictionary yang berisi:
+    *   `name`: Nama unik untuk *tool* Anda (misalnya, `call_my_new_mcp`).
+    *   `description`: Penjelasan tentang apa yang dilakukan oleh *tool* ini. Penjelasan ini sangat penting karena akan digunakan oleh model AI untuk memutuskan kapan harus menggunakan *tool* tersebut.
+    *   `env_var`: Nama variabel lingkungan (environment variable) yang akan menyimpan URL endpoint untuk server MCP Anda (misalnya, `MY_NEW_MCP_URL`).
+3.  **Tambahkan variabel lingkungan baru** ke dalam file konfigurasi `.env` Anda, dengan URL yang sesuai.
+
+**Contoh Penambahan Tool Baru:**
+
+Misalkan Anda ingin menambahkan *tool* untuk menganalisis data cuaca. Anda cukup menambahkan dictionary berikut ke list `MCP_TOOL_DEFINITIONS`:
+
+```python
+# di dalam my_cli_agent/providers/mcp.py
+
+MCP_TOOL_DEFINITIONS: List[Dict[str, Any]] = [
+    # ... definisi yang sudah ada ...
+    {
+        "name": "call_weather_mcp",
+        "description": "Mengirimkan permintaan ke server cuaca untuk mendapatkan analisis cuaca terkini berdasarkan lokasi.",
+        "env_var": "WEATHER_MCP_URL",
+    },
+]
+```
+
+Setelah itu, tambahkan `WEATHER_MCP_URL=http://your-weather-service.com/api` ke file `.env` Anda. Agen akan secara otomatis mengenali dan dapat menggunakan *tool* baru ini tanpa perlu mengubah kode inti lainnya.
+
+## 7. Kontribusi
 
 Kontribusi sangat diterima! Silakan ajukan Pull Request.
 
