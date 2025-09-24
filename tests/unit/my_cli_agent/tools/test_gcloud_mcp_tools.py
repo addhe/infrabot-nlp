@@ -53,5 +53,42 @@ class TestGcloudMcpTools(unittest.TestCase):
         self.assertFalse(result.success)
         self.assertEqual(result.error_message, "Invalid input: command must be a list of strings.")
 
+    @patch.dict(os.environ, {"GCLOUD_MCP_SERVER_URL": "http://mock-gcloud-server"}) # No trailing slash
+    @patch('requests.post')
+    def test_call_gcloud_mcp_url_no_slash(self, mock_post):
+        """Test that the URL is correctly formatted when the env var has no trailing slash."""
+        mock_post.return_value = MagicMock(status_code=200, text='ok')
+        _call_gcloud_mcp("test", {})
+        mock_post.assert_called_once_with(
+            "http://mock-gcloud-server/mcp",
+            json={"tool": "test", "params": {}},
+            headers={"Content-Type": "application/json"},
+            timeout=120
+        )
+
+    @patch('requests.post', side_effect=requests.exceptions.Timeout)
+    @patch.dict(os.environ, {"GCLOUD_MCP_SERVER_URL": "http://mock-server.com/"})
+    def test_call_gcloud_mcp_timeout(self, mock_post):
+        """Test the helper's timeout exception handling."""
+        result = _call_gcloud_mcp("test", {})
+        self.assertFalse(result.success)
+        self.assertIn("timed out", result.error_message)
+
+    @patch('requests.post', side_effect=requests.exceptions.RequestException("Connection failed"))
+    @patch.dict(os.environ, {"GCLOUD_MCP_SERVER_URL": "http://mock-server.com/"})
+    def test_call_gcloud_mcp_request_exception(self, mock_post):
+        """Test the helper's request exception handling."""
+        result = _call_gcloud_mcp("test", {})
+        self.assertFalse(result.success)
+        self.assertIn("Failed to connect", result.error_message)
+
+    @patch('requests.post', side_effect=Exception("Unexpected error"))
+    @patch.dict(os.environ, {"GCLOUD_MCP_SERVER_URL": "http://mock-server.com/"})
+    def test_call_gcloud_mcp_generic_exception(self, mock_post):
+        """Test the helper's generic exception handling."""
+        result = _call_gcloud_mcp("test", {})
+        self.assertFalse(result.success)
+        self.assertIn("An unexpected error occurred", result.error_message)
+
 if __name__ == '__main__':
     unittest.main()

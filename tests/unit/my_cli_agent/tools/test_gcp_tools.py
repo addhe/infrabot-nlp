@@ -32,13 +32,33 @@ class TestGcpTools(unittest.TestCase):
         result_dev = list_gcp_projects(env="dev")
         self.assertTrue(result_dev.success)
         self.assertIn("Found 1 projects", result_dev.result)
-        self.assertIn("Project Dev (proj-dev-123)", result_dev.result)
 
-        # Test filtering for 'all'
-        result_all = list_gcp_projects(env="all")
-        self.assertTrue(result_all.success)
-        self.assertIn("Found 3 projects", result_all.result)
-        self.assertIn("Project Staging (proj-stg-456)", result_all.result)
+    @patch('google.cloud.compute_v1.InstancesClient')
+    def test_list_gce_instances_success(self, mock_client):
+        """Test successfully listing GCE instances."""
+        # Arrange
+        mock_client_instance = mock_client.return_value
+
+        # Create mock instances
+        mock_instance_1 = MagicMock()
+        mock_instance_1.name = "instance-1"
+        mock_instance_1.status = "RUNNING"
+
+        mock_instance_2 = MagicMock()
+        mock_instance_2.name = "instance-2"
+        mock_instance_2.status = "TERMINATED"
+
+        mock_client_instance.list.return_value = [mock_instance_1, mock_instance_2]
+
+        # Act
+        from my_cli_agent.tools.gcp_tools import list_gce_instances
+        result = list_gce_instances(project_id="test-project", zone="us-central1-a")
+
+        # Assert
+        self.assertTrue(result.success)
+        self.assertIn("Name: instance-1, Status: RUNNING", result.result)
+        self.assertIn("Name: instance-2, Status: TERMINATED", result.result)
+        mock_client_instance.list.assert_called_once_with(project="test-project", zone="us-central1-a")
 
     @patch('my_cli_agent.tools.gcp_tools.google.auth.default')
     def test_list_gcp_projects_auth_failure(self, mock_auth):

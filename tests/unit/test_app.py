@@ -76,5 +76,26 @@ class TestApp(unittest.TestCase):
         self.assertIn("Maaf, terjadi kesalahan", response_data['text'])
         self.assertIn("Something went wrong", response_data['text'])
 
+    def test_handle_event_unknown_type(self):
+        """Test an unhandled event type."""
+        chat_event = {"type": "CARD_CLICKED"} # An event type the app doesn't handle
+        response = self.app.post('/', data=json.dumps(chat_event), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, b'{}\n') # Should do nothing and return empty JSON
+
+    def test_handle_event_message_with_empty_prompt(self):
+        """
+        Test a MESSAGE event that results in an empty prompt.
+        This happens if the message only contains the bot's name.
+        """
+        chat_event = {
+            "type": "MESSAGE",
+            "message": {"text": "@Infrabot"} # Results in empty prompt
+        }
+        response = self.app.post('/', data=json.dumps(chat_event), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        response_data = json.loads(response.data)
+        self.assertIn("Halo! Anda bisa bertanya kepada saya", response_data['text'])
+
 if __name__ == '__main__':
     unittest.main()

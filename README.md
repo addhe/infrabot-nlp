@@ -54,7 +54,6 @@ Bot ini dimaksudkan untuk di-deploy sebagai layanan web. Cara yang direkomendasi
       - `GOOGLE_API_KEY`: Kunci API Anda dari Google AI Studio.
       - `MCP_SERVER_URL`: URL ke instance Zen MCP Anda yang sedang berjalan.
       - `SEQ_THINKING_MCP_SERVER_URL`: URL ke instance Sequential Thinking Anda.
-      - `PLAYWRIGHT_MCP_SERVER_URL`: URL ke instance Playwright MCP Anda.
 
 3.  **Simpan Rahasia di Secret Manager:**
     Untuk keamanan, simpan konten file `.env` Anda di Google Secret Manager. Buat secret baru (misalnya, `infrabot-env`) dan tambahkan konten file `.env` sebagai versi secret.
