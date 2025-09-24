@@ -12,6 +12,7 @@ setup(
         "python-dotenv",
         "google-cloud-core",
         "google-cloud-resource-manager",
+        "google-cloud-compute",
         "markitdown"
     ],
     extras_require={

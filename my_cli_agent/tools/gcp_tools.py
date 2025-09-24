@@ -59,6 +59,39 @@ def list_gcp_projects(env: str = 'all') -> ToolResult:
         logging.error(f"Failed to list GCP projects: {e}", exc_info=True)
         return ToolResult(success=False, error_message=f"An unexpected error occurred while listing projects: {e}")
 
+def list_gce_instances(project_id: str, zone: str) -> ToolResult:
+    """
+    Lists all Google Compute Engine (GCE) instances in a specific project and zone.
+
+    Args:
+        project_id: The ID of the Google Cloud project.
+        zone: The zone to list instances from (e.g., 'us-central1-a').
+
+    Returns:
+        A ToolResult object containing a formatted list of instances or an error.
+    """
+    if not HAS_GCP_TOOLS:
+        return ToolResult(success=False, error_message="GCP client libraries are not installed.")
+
+    try:
+        from google.cloud import compute_v1
+
+        instance_client = compute_v1.InstancesClient()
+        instance_list = instance_client.list(project=project_id, zone=zone)
+
+        if not instance_list:
+            return ToolResult(success=True, result=f"No GCE instances found in project '{project_id}' and zone '{zone}'.")
+
+        formatted_list = ["GCE Instances:"]
+        for instance in instance_list:
+            formatted_list.append(f"- Name: {instance.name}, Status: {instance.status}")
+
+        return ToolResult(success=True, result="\n".join(formatted_list))
+
+    except Exception as e:
+        logging.error(f"Failed to list GCE instances for project '{project_id}': {e}", exc_info=True)
+        return ToolResult(success=False, error_message=f"An unexpected error occurred while listing GCE instances: {e}")
+
 
 def create_gcp_project(project_id: str) -> ToolResult:
     """

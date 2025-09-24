@@ -13,10 +13,10 @@ from .providers.mcp import get_mcp_tools
 # Import tools and models
 from .tools.time_tools import get_current_time
 from .tools.command_tools import execute_command
-from .tools.gcp_tools import list_gcp_projects, create_gcp_project, HAS_GCP_TOOLS
+from .tools.gcp_tools import list_gcp_projects, create_gcp_project, list_gce_instances, HAS_GCP_TOOLS
 from .tools.markdown_tools import convert_file_to_markdown
-from .tools.playwright_tools import browser_navigate, browser_snapshot, browser_click, browser_type
 from .tools.gcloud_mcp_tools import run_gcloud_command
+from .tools.web_tools import view_website
 from .models import Tool, ToolResult
 
 class Agent:
@@ -28,40 +28,35 @@ class Agent:
     def __init__(self):
         """Initializes the agent, its provider, and its tools."""
         self.provider = self._setup_provider()
-        self.tools: Dict[str, Callable[..., ToolResult]] = {
-            "get_current_time": get_current_time,
-            "execute_command": execute_command,
-        }
+        self.tools: Dict[str, Tool] = {}
         
+        # Manually register tools
+        self._register_tool(get_current_time)
+        self._register_tool(execute_command)
+        self._register_tool(convert_file_to_markdown)
+        self._register_tool(view_website)
+        self._register_tool(run_gcloud_command)
+
         if HAS_GCP_TOOLS:
-            self.tools["list_gcp_projects"] = list_gcp_projects
-            self.tools["create_gcp_project"] = create_gcp_project
+            self._register_tool(list_gcp_projects)
+            self._register_tool(create_gcp_project)
+            self._register_tool(list_gce_instances)
         
         # Add MCP tools from the centralized provider
         mcp_tools = get_mcp_tools()
         for tool in mcp_tools:
-            self.tools[tool.name] = tool.func
+            self.tools[tool.name] = tool
         
-        # Add the MarkItDown tool
-        from .tools.markdown_tools import convert_file_to_markdown
-        self.tools["convert_file_to_markdown"] = convert_file_to_markdown
-        
-        # Add Playwright tools for browser automation
-        from .tools.playwright_tools import browser_initialize, browser_navigate, browser_snapshot, browser_click, browser_type
-        self.tools["browser_initialize"] = browser_initialize
-        self.tools["browser_navigate"] = browser_navigate
-        self.tools["browser_snapshot"] = browser_snapshot
-        self.tools["browser_click"] = browser_click
-        self.tools["browser_type"] = browser_type
-        
-        # Add gcloud MCP tool for native GCP commands
-        from .tools.gcloud_mcp_tools import run_gcloud_command
-        self.tools["run_gcloud_command"] = run_gcloud_command
-        
-        # Internal state to track browser session
-        self.browser_session_active = False
-        
-        logging.info(f"Agent initialized with {len(self.tools)} tools.")
+        logging.info(f"Agent initialized with {len(self.tools)} tools: {list(self.tools.keys())}")
+
+    def _register_tool(self, tool_function: Callable[..., ToolResult]):
+        """Helper to create a Tool object and register it."""
+        tool = Tool(
+            name=tool_function.__name__,
+            description=tool_function.__doc__ or "No description available.",
+            func=tool_function
+        )
+        self.tools[tool.name] = tool
 
     def _setup_provider(self) -> GeminiProvider:
         """Sets up the Gemini provider."""
@@ -87,18 +82,11 @@ class Agent:
 
                     if tool_name in self.tools:
                         logging.info(f"Executing tool '{tool_name}' with args: {tool_args}")
-                        tool_function = self.tools[tool_name]
+                        tool_to_run = self.tools[tool_name]
                         
-                        # Check if a browser tool is called without an active session
-                        if tool_name.startswith("browser_") and tool_name != "browser_initialize" and not self.browser_session_active:
-                            return "Error: A browser session has not been initialized. Please start by asking to initialize the browser."
-
-                        result: ToolResult = tool_function(**tool_args)
+                        result: ToolResult = tool_to_run.func(**tool_args)
                         
                         if result.success:
-                            # If initialization was successful, update the state
-                            if tool_name == "browser_initialize":
-                                self.browser_session_active = True
                             return result.result
                         else:
                             logging.warning(f"Tool '{tool_name}' failed: {result.error_message}")
@@ -124,18 +112,17 @@ class Agent:
             "Analyze the user's request and determine if one of the following tools can fulfill it.",
             "Available tools:",
         ]
-        for name in self.tools.keys():
-            instructions.append(f"- {name}")
+        for name, tool in self.tools.items():
+            # Clean up the description for better prompting
+            clean_description = ' '.join(tool.description.strip().split())
+            instructions.append(f"- {name}: {clean_description}")
 
         instructions.append("\nUse the 'call_mcp_server' tool for complex, multi-step tasks such as code reviews, debugging, planning, or security audits.")
         instructions.append("Use the 'call_sequential_thinking_server' tool for problems that require deep, step-by-step reasoning, analysis, or breaking down a complex question.")
         instructions.append("Use the 'convert_file_to_markdown' tool to read and convert the content of a local file (like a PDF or DOCX) into Markdown text.")
-        instructions.extend([
-            "\nFor web browser tasks, you MUST follow this sequence:",
-            "1. ALWAYS call 'browser_initialize' FIRST to start the session.",
-            "2. Then, you can use other browser tools like 'browser_navigate', 'browser_snapshot', 'browser_click', or 'browser_type'."
-        ])
-        instructions.append("Use 'run_gcloud_command' for any tasks related to Google Cloud Platform. The arguments should be a list of strings, for example: ['compute', 'instances', 'list', '--project=my-project']")
+        instructions.append("Use the 'view_website' tool to get the text content of a URL.")
+        instructions.append("Use 'list_gce_instances' to list virtual machine instances from Google Compute Engine.")
+        instructions.append("Use 'run_gcloud_command' for any other tasks related to Google Cloud Platform. The arguments should be a list of strings, for example: ['compute', 'instances', 'list', '--project=my-project']")
         
         instructions.extend([
             "\nRespond in the following format ONLY:",
