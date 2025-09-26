@@ -1,9 +1,0 @@
-steps:
-- name: gcr.io/cloud-builders/docker
-  args: ['build', '-f', 'proxy.Dockerfile', '-t', 'us-central1-docker.pkg.dev/awanmasterpiece/cloud-run-source-deploy/playwright-proxy:latest', '.']
-- name: gcr.io/cloud-builders/docker
-  args: ['push', 'us-central1-docker.pkg.dev/awanmasterpiece/cloud-run-source-deploy/playwright-proxy:latest']
-options:
-  logging: CLOUD_LOGGING_ONLY
-images:
-- us-central1-docker.pkg.dev/awanmasterpiece/cloud-run-source-deploy/playwright-proxy:latest
