@@ -1,21 +1,20 @@
-# Use the official Playwright image
-FROM mcr.microsoft.com/playwright:v1.40.0-jammy
+# Use an official Python runtime as a parent image
+FROM python:3.10-slim
 
+# Set the working directory in the container
 WORKDIR /usr/src/app
 
-# Copy source code and the new run script
+# Copy the requirements file into the container at /usr/src/app
+COPY requirements.txt .
+
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application's code into the container
 COPY . .
-COPY run_playwright.sh .
 
-# Make the script executable
-RUN chmod +x run_playwright.sh
+# Set the environment variable for the gcloud MCP server
+ENV GCLOUD_MCP_SERVER_URL="https://gcloud-mcp-361046956504.us-central1.run.app"
 
-# Install dependencies
-RUN npm install
-RUN npm install -g @playwright/mcp@latest
-RUN npx playwright install --with-deps
-
-EXPOSE 8931
-
-# Run the server using the script
-CMD ["./run_playwright.sh"]
+# Run app.py when the container launches
+CMD ["python", "app.py"]
