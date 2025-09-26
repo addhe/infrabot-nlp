@@ -43,7 +43,7 @@ echo "[INFO] Service:   ${SERVICE}"
 echo "[INFO] Image:     ${IMAGE_PATH}"
 echo "[INFO] MCP URL:   ${GCLOUD_MCP_SERVER_URL}"
 
-echo "\n[STEP] Configuring gcloud project"
+printf "\n[STEP] Configuring gcloud project\n"
 gcloud config set project "${PROJECT_ID}" >/dev/null
 
 echo "[STEP] Enabling required services (idempotent)"
@@ -70,7 +70,7 @@ docker push "${IMAGE_PATH}"
 echo "[STEP] Preparing Secret Manager: ${SECRET_NAME}"
 if ! gcloud secrets describe ${SECRET_NAME} >/dev/null 2>&1; then
   echo "[INFO] Secret '${SECRET_NAME}' not found. Creating..."
-  gcloud secrets create ${SECRET_NAME} --replication-policy=\"automatic\"
+  gcloud secrets create ${SECRET_NAME} --replication-policy=automatic
 fi
 
 if [[ -n "${API_KEY_FROM_ARG}" ]]; then
@@ -83,8 +83,8 @@ fi
 echo "[STEP] Checking for enabled secret versions"
 set +e
 ENABLED_SECRET_VERSION=$(gcloud secrets versions list ${SECRET_NAME} \
-  --filter="state=ENABLED" \
-  --format=\"value(name)\" \
+  --filter='state=ENABLED' \
+  --format='value(name)' \
   --limit=1 2>/dev/null)
 set -e
 if [[ -n "${ENABLED_SECRET_VERSION}" ]]; then
@@ -129,5 +129,5 @@ fi
 
 gcloud run deploy "${DEPLOY_ARGS[@]}"
 
-echo "\n[DONE] Deployment complete."
+printf "\n[DONE] Deployment complete.\n"
 echo "[INFO] Service URL: $(gcloud run services describe ${SERVICE} --region ${REGION} --format='value(status.url)')"
