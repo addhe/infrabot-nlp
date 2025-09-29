@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 import os
 os.environ['GOOGLE_API_KEY'] = 'test-key'
 
-from app import app
+from my_cli_agent.app import app
 
 class TestApp(unittest.TestCase):
 
@@ -15,7 +15,7 @@ class TestApp(unittest.TestCase):
         self.app = app.test_client()
         self.app.testing = True
 
-    @patch('app.agent')
+    @patch('my_cli_agent.app.agent')
     def test_handle_event_message_success(self, mock_agent):
         """Test a successful MESSAGE event."""
         # Arrange
@@ -57,7 +57,7 @@ class TestApp(unittest.TestCase):
         response = self.app.post('/', data=None, content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
-    @patch('app.agent')
+    @patch('my_cli_agent.app.agent')
     def test_handle_event_agent_exception(self, mock_agent):
         """Test when the agent throws an exception."""
         # Arrange

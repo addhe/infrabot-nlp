@@ -15,13 +15,13 @@ Dokumen ini menyediakan spesifikasi desain perangkat lunak terperinci untuk Infr
 Sistem ini dirancang sebagai aplikasi web Python stateless yang di-container-isasi, mengikuti arsitektur yang diuraikan dalam TDD. Desain perangkat lunak ini berfokus pada modularitas, pemisahan tanggung jawab (*separation of concerns*), dan ekstensibilitas.
 
 Tiga lapisan utama dalam desain perangkat lunak adalah:
-1.  **Presentation Layer (`app.py`):** Bertanggung jawab untuk menangani interaksi HTTP dengan Google Chat API.
+1.  **Presentation Layer (`my_cli_agent/app.py`):** Bertanggung jawab untuk menangani interaksi HTTP dengan Google Chat API.
 2.  **Business Logic Layer (`my_cli_agent/agent_new.py`):** Mengandung logika inti untuk memproses permintaan dan mengorkestrasi penggunaan *tools*.
 3.  **Data & Service Access Layer (`my_cli_agent/tools/` & `my_cli_agent/providers/`):** Bertanggung jawab untuk berinteraksi dengan layanan eksternal (shell, GCP, LLM API).
 
 ## 3. Desain Modul dan Kelas
 
-### 3.1. Modul: `app.py` (Presentation Layer)
+### 3.1. Modul: `my_cli_agent/app.py` (Presentation Layer)
 
 *   **Tujuan:** Bertindak sebagai *entry point* dan menangani semua komunikasi HTTP.
 *   **Struktur:**
@@ -36,7 +36,7 @@ Tiga lapisan utama dalam desain perangkat lunak adalah:
             *   Menggunakan `google.oauth2.id_token.verify_oauth2_token` untuk memverifikasi Bearer Token (JWT) terhadap audiens yang diharapkan (ID proyek Google Cloud). Jika gagal, kembalikan status `401 Unauthorized`.
         2.  **Parsing Event:**
             *   Mendapatkan body JSON dari `request.get_json()`.
-            *   Memeriksa tipe event. Hanya proses jika `event['type'] == 'MESSAGE'`.
+            *   Memeriksa tipe event. Hanya proses jika `event['type'] == 'MESSAGE'`. 
             *   Mengekstrak teks pesan dari `event['message']['text']`. Teks ini akan berisi nama mention bot, yang perlu dibersihkan.
         3.  **Pemanggilan Logika Bisnis:**
             *   Memanggil `response_text = agent.handle_chat_message(cleaned_text)`.
@@ -113,7 +113,7 @@ Tiga lapisan utama dalam desain perangkat lunak adalah:
 
 ## 5. Strategi Penanganan Kesalahan
 
-*   **Level 1: Kegagalan Verifikasi (di `app.py`)**
+*   **Level 1: Kegagalan Verifikasi (di `my_cli_agent/app.py`)**
     *   **Penyebab:** Token JWT tidak valid atau tidak ada.
     *   **Tindakan:** Segera kembalikan status `401` atau `403`. Tidak ada pemrosesan lebih lanjut.
 *   **Level 2: Kegagalan Eksekusi Tool (di `tools/*.py`)**
@@ -122,7 +122,7 @@ Tiga lapisan utama dalam desain perangkat lunak adalah:
 *   **Level 3: Kegagalan Logika Bisnis (di `Agent`)**
     *   **Penyebab:** LLM tidak merespons, *tool* yang diminta tidak ada.
     *   **Tindakan:** `handle_chat_message` menangkap ini dan mengembalikan string kesalahan, misalnya, `"Maaf, saya tidak dapat menemukan tool bernama '...'"`.
-*   **Level 4: Kegagalan Aplikasi Umum (di `app.py`)**
+*   **Level 4: Kegagalan Aplikasi Umum (di `my_cli_agent/app.py`)**
     *   **Penyebab:** Kesalahan tak terduga (misalnya, kehabisan memori).
     *   **Tindakan:** Blok `try...except` utama menangkap *exception*, mencatatnya, dan mengembalikan pesan kesalahan umum dengan status `500`.
 

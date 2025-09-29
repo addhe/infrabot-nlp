@@ -17,4 +17,4 @@ COPY . .
 ENV GCLOUD_MCP_SERVER_URL="https://gcloud-mcp-361046956504.us-central1.run.app"
 
 # Run app.py when the container launches
-CMD ["python", "app.py"]
+CMD ["python", "-m", "my_cli_agent.app"]

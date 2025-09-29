@@ -31,7 +31,7 @@ Sistem akan mengadopsi arsitektur berbasis webhook yang *serverless*, di-hosting
   |
   |-- [Container: Python + Gunicorn]
   |     |
-  |     |-- [app.py: Flask Web Server] -- (3. Receives & Verifies Request)
+  |     |-- [my_cli_agent/app.py: Flask Web Server] -- (3. Receives & Verifies Request)
   |     |      |
   |     |      | (4. Calls Agent logic)
   |     |      v
@@ -45,7 +45,7 @@ Sistem akan mengadopsi arsitektur berbasis webhook yang *serverless*, di-hosting
   |     |
   |     | (6. Returns formatted string response)
   |     v
-  |-- [app.py: Flask Web Server] -- (7. Wraps response in Chat JSON format)
+  |-- [my_cli_agent/app.py: Flask Web Server] -- (7. Wraps response in Chat JSON format)
   |
   v
 [Google Chat API] -- (8. Receives 200 OK with JSON response)
@@ -58,16 +58,16 @@ Sistem akan mengadopsi arsitektur berbasis webhook yang *serverless*, di-hosting
 
 1.  **Google Chat API:** Bertindak sebagai antarmuka antara pengguna dan layanan bot kita.
 2.  **Google Cloud Run:** Platform hosting *serverless* yang akan menjalankan container Docker aplikasi kita.
-3.  **Flask Web Service (`app.py`):** Titik masuk aplikasi. Bertanggung jawab untuk menerima permintaan HTTP dari Google Chat, memverifikasinya, dan mengembalikan respons yang diformat.
+3.  **Flask Web Service (`my_cli_agent/app.py`):** Titik masuk aplikasi. Bertanggung jawab untuk menerima permintaan HTTP dari Google Chat, memverifikasinya, dan mengembalikan respons yang diformat.
 4.  **Agent Core (`my_cli_agent/agent_new.py`):** Otak dari aplikasi. Berisi logika untuk berinteraksi dengan LLM (Gemini) dan mengeksekusi *tools* yang sesuai.
 5.  **Tool Modules (`my_cli_agent/tools/`):** Kumpulan fungsi Python yang dapat dieksekusi oleh agen. Ini termasuk *tools* sederhana (seperti `execute_command`) dan klien untuk layanan yang lebih kompleks (seperti server MCP Playwright dan Zen).
 6.  **LLM Provider (`my_cli_agent/providers/`):** Modul yang bertanggung jawab untuk berkomunikasi dengan API model bahasa (Gemini).
 
 ## 3. Desain Komponen Terperinci
 
-### 3.1. Flask Web Service (`app.py`)
+### 3.1. Flask Web Service (`my_cli_agent/app.py`)
 
-*   **File:** `app.py` (akan dibuat di direktori root).
+*   **File:** `my_cli_agent/app.py`.
 *   **Framework:** Flask.
 *   **Endpoint:** Akan ada satu endpoint utama: `POST /`.
 *   **Logika Endpoint:**
@@ -97,15 +97,15 @@ Berikut adalah alur data langkah-demi-langkah untuk satu interaksi:
 
 1.  **Input Pengguna:** Pengguna mengetik `@Infrabot list gcp projects in dev` di Google Chat.
 2.  **Webhook Trigger:** Google Chat mengirimkan permintaan `POST` ke URL Cloud Run yang telah dikonfigurasi.
-3.  **Verifikasi:** `app.py` menerima permintaan dan memverifikasi Bearer Token di header.
-4.  **Ekstraksi:** `app.py` mengekstrak teks: `"list gcp projects in dev"`.
-5.  **Pemrosesan Agen:** `app.py` memanggil `agent.handle_chat_message("list gcp projects in dev")`.
+3.  **Verifikasi:** `my_cli_agent/app.py` menerima permintaan dan memverifikasi Bearer Token di header.
+4.  **Ekstraksi:** `my_cli_agent/app.py` mengekstrak teks: `"list gcp projects in dev"`.
+5.  **Pemrosesan Agen:** `my_cli_agent/app.py` memanggil `agent.handle_chat_message("list gcp projects in dev")`.
 6.  **Pemahaman LLM:** `Agent` mengirimkan prompt ke Gemini untuk menentukan *tool* yang akan digunakan. Gemini merespons dengan indikasi untuk menggunakan `list_gcp_projects` dengan argumen `dev`.
 7.  **Eksekusi Tool:** `Agent` memanggil fungsi `list_gcp_projects('dev')` dari `gcp_tools.py`.
 8.  **Pengumpulan Hasil:** Fungsi tersebut mengembalikan string yang berisi daftar proyek.
 9.  **Pemformatan Awal:** `handle_chat_message` menerima hasil ini dan memformatnya, lalu mengembalikan string tunggal: `"Berikut adalah proyek di lingkungan dev:\n- proj-a\n- proj-b"`.
-10. **Pemformatan Akhir:** `app.py` mengambil string ini dan membungkusnya dalam JSON: `{"text": "Berikut adalah proyek di lingkungan dev:\n- proj-a\n- proj-b"}`.
-11. **Respons HTTP:** `app.py` mengirimkan JSON ini kembali ke Google Chat API dengan status `200 OK`.
+10. **Pemformatan Akhir:** `my_cli_agent/app.py` mengambil string ini dan membungkusnya dalam JSON: `{"text": "Berikut adalah proyek di lingkungan dev:\n- proj-a\n- proj-b"}`.
+11. **Respons HTTP:** `my_cli_agent/app.py` mengirimkan JSON ini kembali ke Google Chat API dengan status `200 OK`.
 12. **Output Pengguna:** Google Chat menampilkan pesan dari bot di ruang chat.
 
 ## 5. Deployment dan Infrastruktur
@@ -113,10 +113,10 @@ Berikut adalah alur data langkah-demi-langkah untuk satu interaksi:
 *   **Containerisasi (`Dockerfile`):**
     *   `FROM python:3.10-slim` akan tetap digunakan.
     *   `requirements.txt` akan diperbarui untuk menyertakan `Flask`, `gunicorn`, dan `google-api-python-client`.
-    *   `COPY` akan menyertakan file `app.py` yang baru.
+    *   `COPY` akan menyertakan file `my_cli_agent/app.py` yang baru.
     *   `CMD` akan diubah untuk menjalankan server aplikasi web Gunicorn, yang lebih kuat daripada server development Flask. Perintahnya adalah:
         ```sh
-        CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
+        CMD ["gunicorn", "--bind", "0.0.0.0:8080", "my_cli_agent.app:app"]
         ```
         Cloud Run secara otomatis akan menyediakan variabel lingkungan `$PORT`, tetapi `8080` adalah default yang baik.
 

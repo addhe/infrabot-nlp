@@ -30,11 +30,11 @@ Sistem ini menggunakan arsitektur berbasis webhook. Google Chat mengirimkan even
 +------------------------------------+-----------------------------------------+
 | Infrabot Container (Python/Flask/Gunicorn)                                   |
 |                                                                              |
-|  +------------------+      +-----------------------+      +------------------+
-|  | app.py           | <--> | my_cli_agent/         | <--> | Tools & Services |
-|  | (Web Endpoint)   |      | agent_new.py          |      | (MCPs, GCP, etc.)|
-|  +------------------+      | (Orchestration Logic) |      +------------------+
-|                            +-----------------------+                         |
+|  +-----------------------+      +-----------------------+      +------------------+
+|  | my_cli_agent/app.py   | <--> | my_cli_agent/         | <--> | Tools & Services |
+|  | (Web Endpoint)        |      | agent_new.py          |      | (MCPs, GCP, etc.)|
+|  +-----------------------+      | (Orchestration Logic) |      +------------------+
+|                                 +-----------------------+                         |
 |                                       |                                      |
 |                                       v                                      |
 |                            +-----------------------+                         |
@@ -48,7 +48,7 @@ Sistem ini menggunakan arsitektur berbasis webhook. Google Chat mengirimkan even
 
 ## 4. Komponen Utama
 
-### 4.1. Lapisan Presentasi (`app.py`)
+### 4.1. Lapisan Presentasi (`my_cli_agent/app.py`)
 
 *   **Teknologi:** Flask, Gunicorn.
 *   **Tanggung Jawab:**
@@ -84,15 +84,15 @@ Sistem ini menggunakan arsitektur berbasis webhook. Google Chat mengirimkan even
 
 1.  Pengguna mengirim pesan ke bot di Google Chat.
 2.  Google Chat mengirimkan `POST` request ke URL layanan Cloud Run.
-3.  `app.py` menerima dan memverifikasi permintaan.
-4.  `app.py` meneruskan teks pesan ke `agent.handle_chat_message()`.
+3.  `my_cli_agent/app.py` menerima dan memverifikasi permintaan.
+4.  `my_cli_agent/app.py` meneruskan teks pesan ke `agent.handle_chat_message()`.
 5.  `Agent` membuat prompt khusus untuk LLM, menanyakan *tool* mana (jika ada) yang harus digunakan.
 6.  LLM merespons dengan nama *tool* dan argumennya.
 7.  `Agent` memanggil fungsi *tool* yang sesuai dari direktori `tools/`.
 8.  *Tool* dieksekusi (misalnya, melakukan panggilan API ke server MCP).
 9.  *Tool* mengembalikan objek `ToolResult` (berisi sukses/gagal dan hasilnya).
 10. `Agent` memformat hasil dari `ToolResult` menjadi string yang ramah-baca.
-11. `app.py` membungkus string respons dalam format JSON Google Chat dan mengirimkannya kembali sebagai respons HTTP `200 OK`.
+11. `my_cli_agent/app.py` membungkus string respons dalam format JSON Google Chat dan mengirimkannya kembali sebagai respons HTTP `200 OK`.
 12. Google Chat menampilkan balasan bot kepada pengguna.
 
 ## 6. Pertimbangan Deployment

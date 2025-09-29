@@ -87,9 +87,9 @@ Bot ini dimaksudkan untuk di-deploy sebagai layanan web. Cara yang direkomendasi
 Struktur proyek telah di-refactor untuk mendukung arsitektur layanan web:
 
 ```
-├── app.py                    # Entry point aplikasi Flask
 ├── my_cli_agent/             # Logika inti agen
 │   ├── __init__.py
+│   ├── app.py                  # Entry point aplikasi Flask
 │   ├── agent_new.py          # Kelas Agent utama
 │   ├── models.py             # Model data (Tool, ToolResult)
 │   ├── providers/            # Penyedia LLM dan Tool
