@@ -16,7 +16,7 @@ from .tools.command_tools import execute_command
 from .tools.gcp_tools import list_gcp_projects, create_gcp_project, HAS_GCP_TOOLS
 from .tools.markdown_tools import convert_file_to_markdown
 from .tools.playwright_tools import browser_navigate, browser_snapshot, browser_click, browser_type
-from .tools.gcloud_mcp_tools import run_gcloud_command
+from .tools.gcloud_mcp_tools import run_gcloud_command, create_small_ubuntu_vm, create_compute_instance
 from .models import Tool, ToolResult
 
 class Agent:
@@ -55,8 +55,9 @@ class Agent:
         self.tools["browser_type"] = browser_type
         
         # Add gcloud MCP tool for native GCP commands
-        from .tools.gcloud_mcp_tools import run_gcloud_command
         self.tools["run_gcloud_command"] = run_gcloud_command
+        self.tools["create_small_ubuntu_vm"] = create_small_ubuntu_vm
+        self.tools["create_compute_instance"] = create_compute_instance
         
         # Internal state to track browser session
         self.browser_session_active = False

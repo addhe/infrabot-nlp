@@ -9,13 +9,13 @@ class TestGcloudMcpTools(unittest.TestCase):
 
     @patch.dict(os.environ, {"GCLOUD_MCP_SERVER_URL": "http://mock-gcloud-server/"})
     @patch('requests.post')
-    def test_call_gcloud_mcp_success(self, mock_post):
-        """Test the internal helper function for a successful call."""
-        # Arrange
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.text = '{"status": "ok"}'
-        mock_post.return_value = mock_response
+    def test_call_gcloud_mcp_primary_success(self, mock_post):
+        """Primary path (root with input) returns non-empty 2xx and is used."""
+        # Arrange: primary call success
+        mock_response_primary = MagicMock()
+        mock_response_primary.status_code = 200
+        mock_response_primary.text = '{"status": "ok"}'
+        mock_post.return_value = mock_response_primary
 
         # Act
         result = _call_gcloud_mcp("test_tool", {"param": "value"})
@@ -24,9 +24,46 @@ class TestGcloudMcpTools(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.result, '{"status": "ok"}')
         mock_post.assert_called_once_with(
+            "http://mock-gcloud-server/",
+            json={"tool": "test_tool", "input": {"param": "value"}},
+            headers={"Content-Type": "application/json", "Accept": "application/json, text/plain;q=0.8,*/*;q=0.5"},
+            timeout=120
+        )
+
+    @patch.dict(os.environ, {"GCLOUD_MCP_SERVER_URL": "http://mock-gcloud-server"})
+    @patch('requests.post')
+    def test_call_gcloud_mcp_fallback_when_empty_body(self, mock_post):
+        """When primary returns 2xx with empty body, fallback to /mcp with params is used."""
+        # Arrange: primary empty, then fallback success
+        mock_response_primary = MagicMock()
+        mock_response_primary.status_code = 200
+        mock_response_primary.text = ''
+
+        mock_response_fallback = MagicMock()
+        mock_response_fallback.status_code = 200
+        mock_response_fallback.text = '{"status": "ok-fallback"}'
+
+        mock_post.side_effect = [mock_response_primary, mock_response_fallback]
+
+        # Act
+        result = _call_gcloud_mcp("test_tool", {"param": "value"})
+
+        # Assert
+        self.assertTrue(result.success)
+        self.assertEqual(result.result, '{"status": "ok-fallback"}')
+        self.assertEqual(mock_post.call_count, 2)
+        # First call: primary
+        mock_post.assert_any_call(
+            "http://mock-gcloud-server/",
+            json={"tool": "test_tool", "input": {"param": "value"}},
+            headers={"Content-Type": "application/json", "Accept": "application/json, text/plain;q=0.8,*/*;q=0.5"},
+            timeout=120
+        )
+        # Second call: fallback
+        mock_post.assert_any_call(
             "http://mock-gcloud-server/mcp",
             json={"tool": "test_tool", "params": {"param": "value"}},
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", "Accept": "application/json, text/plain;q=0.8,*/*;q=0.5"},
             timeout=120
         )
 
